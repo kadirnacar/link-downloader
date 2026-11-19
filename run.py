@@ -1,167 +1,204 @@
 #!/usr/bin/env python3
 """
-ytdlp-studio · README.md cross-compile bölümü güncelleyici
+ytdlp-studio · Cross-compile düzeltmeleri
 
-- README.md içine marker'lı "Cross-Compile (macOS -> Windows / Linux)" bölümü ekler.
-- Bölüm zaten varsa yalnızca o bölümü değiştirir (idempotent).
-- README.md yoksa hata verir (önce create_github_readme.py çalıştırılmalı).
-- Backup oluşturmaz; başka dosyaya dokunmaz.
+1. build/docker/Dockerfile.cross → Go 1.27 sürümüne yükselt
+2. services/download.go → Reveal fonksiyonunu cross-platform yap (macOS/Windows/Linux)
+
+Backup oluşturmaz. Markdown üretmez.
 """
 
+import re
 import sys
 from pathlib import Path
 
 ROOT = None
-START = "<!-- ytdlp-studio:xcompile v1 -->"
-END = "<!-- ytdlp-studio:xcompile v1:end -->"
-ANCHOR = "## 🧯 Sorun Giderme"
-
-SECTION = (
-    START
-    + """
-## 🌍 Cross-Compile (macOS → Windows / Linux)
-
-Wails v3, kök `Taskfile.yml` üzerindeki `GOOS` değişkeni ile görevleri platform
-Taskfile'lerine dispatch eder (`windows:`, `linux:`, `darwin:`…). Host işletim
-sisteminden farklı bir hedef seçildiğinde derleme, `task setup:docker` ile kurulan
-cross-compile Docker imajı içinde gerçekleştirilir.
-
-### Ön hazırlık (tek seferlik)
-
-```bash
-task setup:docker     # ~800 MB cross-compile imajı (Linux/Windows araç zincirleri)
-wails3 doctor         # ortam doğrulaması
-```
-
-### Windows hedefi (macOS üzerinden)
-
-```bash
-# Derleme (portable EXE)
-GOOS=windows GOARCH=amd64 task build
-# eşdeğeri:
-wails3 build GOOS=windows GOARCH=amd64
-# çıktı: bin/ytdlp-studio.exe
-```
-
-- Windows hedefi CGO gerektirmez; hedef makinede **WebView2 Runtime** bulunmalıdır.
-- **Paketleme (MSIX):** `makeappx`/`signtool` gibi Windows SDK araçları gerektirir, macOS'ta
-  üretilemez. MSIX için bir Windows makinesinde veya CI'da (GitHub Actions `windows-latest`)
-  `task install:msix:tools` + `task package` çalıştırın; ya da `bin/ytdlp-studio.exe`
-  dosyasını portable olarak dağıtın.
-
-### Linux hedefi (macOS üzerinden)
-
-```bash
-# Derleme
-GOOS=linux GOARCH=amd64 task build
-# Paketleme (çıktı yolu için build/linux/Taskfile.yml / task --list-all)
-GOOS=linux GOARCH=amd64 task package
-```
-
-- Linux GUI hedefi CGO + WebKitGTK başlıkları gerektirdiğinden **Docker imajı zorunludur**
-  (`task setup:docker`).
-- Hedef makinede `libwebkit2gtk-4.1` çalışma zamanı kütüphaneleri bulunmalıdır.
-
-### Mimari varyantları
-
-```bash
-GOOS=linux GOARCH=arm64 task build      # örn. Raspberry Pi / ARM sunucu
-GOOS=windows GOARCH=arm64 task build    # Windows on ARM
-```
-
-### Headless / server modu (GUI'siz, CGO'suz)
-
-```bash
-GOOS=linux GOARCH=amd64 task build:server   # yalnızca HTTP sunucu
-task build:docker                            # server modu için Docker imajı
-task run:docker                              # imajı çalıştır
-```
-
-Server modu WebKit/CGO gerektirmez; düz Go cross-compile ile her platforma üretilebilir.
-
-### Cross-compile notları
-
-- Frontend (`frontend/dist`) platformdan bağımsızdır ve binary'ye gömülür (`//go:embed`).
-- yt-dlp / ffmpeg / ffprobe / bun, hedef platforma uygun sürümleriyle **çalışma zamanında**
-  otomatik indirilir; cross-build imajına dahil etmenize gerek yoktur.
-- `DownloadService.Reveal` ("Finder'da göster") şu an yalnızca macOS'ta çalışır;
-  Windows/Linux hedeflerinde hata döner.
-- CI önerisi: matrix kullanarak `windows-latest` üzerinde `task package` (MSIX dahil),
-  `ubuntu-latest` + Docker imajı ile `GOOS=linux task build/package`.
-"""
-    + END
-)
+MODIFIED = []
 
 
-def find_project_root() -> Path:
+def find_project_root():
     current = Path.cwd()
     while current != current.parent:
         if (current / "go.mod").exists() and (current / "Taskfile.yml").exists():
             return current
         current = current.parent
-    raise SystemExit("ERROR: Proje kökü bulunamadı (go.mod + Taskfile.yml aranıyor).")
+    raise SystemExit("ERROR: Proje kökü bulunamadı.")
 
 
-def fail(msg: str) -> None:
+def rel(p):
+    try:
+        return str(p.relative_to(ROOT))
+    except ValueError:
+        return str(p)
+
+
+def fail(msg):
     print("\nERROR:")
     print(msg)
     sys.exit(1)
 
 
-def main() -> None:
+def read(p):
+    if not p.exists():
+        fail(f"Dosya bulunamadı:\n{p}")
+    return p.read_text(encoding="utf-8")
+
+
+def write(p, content):
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(content, encoding="utf-8")
+
+
+# --------------------------------------------------------------------------- #
+# 1. Dockerfile.cross — Go 1.27
+# --------------------------------------------------------------------------- #
+def patch_dockerfile():
+    path = ROOT / "build" / "docker" / "Dockerfile.cross"
+    if not path.exists():
+        fail(f"Dockerfile.cross bulunamadı: {path}")
+
+    content = read(path)
+
+    # Go sürümünü 1.26'dan 1.27'ye yükselt
+    if "golang:1.26" in content:
+        content = content.replace("golang:1.26", "golang:1.27")
+        write(path, content)
+        MODIFIED.append("build/docker/Dockerfile.cross (Go 1.26 → 1.27)")
+        print("UPDATED : build/docker/Dockerfile.cross")
+    elif "golang:1.27" in content:
+        print("ALREADY : build/docker/Dockerfile.cross (Go 1.27)")
+    else:
+        fail("Dockerfile.cross içinde beklenen golang:1.2x kalıbı bulunamadı.")
+
+
+# --------------------------------------------------------------------------- #
+# 2. services/download.go — Reveal cross-platform
+# --------------------------------------------------------------------------- #
+DOWNLOAD_GO_REVEAL = '''func (d *DownloadService) Reveal(path string) error {
+	if path == "" {
+		return errors.New("dosya yolu boş")
+	}
+	st, err := os.Stat(path)
+	switch {
+	case err == nil && st.IsDir():
+		return revealPath(path, false)
+	case err == nil:
+		return revealPath(path, true)
+	default:
+		dir := filepath.Dir(path)
+		if _, e := os.Stat(dir); e == nil {
+			return revealPath(dir, false)
+		}
+		return fmt.Errorf("dosya bulunamadı: %s", path)
+	}
+}
+
+func revealPath(path string, selectFile bool) error {
+	switch runtime.GOOS {
+	case "darwin":
+		if selectFile {
+			return exec.Command("open", "-R", path).Run()
+		}
+		return exec.Command("open", path).Run()
+	case "windows":
+		if selectFile {
+			return exec.Command("explorer.exe", "/select,", path).Run()
+		}
+		return exec.Command("explorer.exe", path).Run()
+	case "linux":
+		// xdg-open genellikle dizinleri ve dosyaları açabilir
+		if selectFile {
+			dir := filepath.Dir(path)
+			return exec.Command("xdg-open", dir).Run()
+		}
+		return exec.Command("xdg-open", path).Run()
+	default:
+		return fmt.Errorf("bu özellik %s platformunda desteklenmiyor", runtime.GOOS)
+	}
+}
+'''
+
+
+def patch_download_reveal():
+    path = ROOT / "services" / "download.go"
+    content = read(path)
+
+    # Mevcut Reveal fonksiyonunu bul ve değiştir
+    pattern = r'func \(d \*DownloadService\) Reveal\(path string\) error \{[^}]+\n\t\}\n\}'
+    match = re.search(pattern, content, re.MULTILINE | re.DOTALL)
+
+    if not match:
+        # Basit pattern ile dene
+        if "func (d *DownloadService) Reveal(path string) error" not in content:
+            fail("Reveal fonksiyonu bulunamadı.")
+        # Manuel bulma
+        start = content.index("func (d *DownloadService) Reveal(path string) error")
+        # Eşleşen parantezleri sayarak sonu bul
+        depth = 0
+        end = start
+        in_func = False
+        for i, ch in enumerate(content[start:], start):
+            if ch == '{':
+                depth += 1
+                in_func = True
+            elif ch == '}':
+                depth -= 1
+                if in_func and depth == 0:
+                    end = i + 1
+                    break
+
+        old_func = content[start:end]
+    else:
+        old_func = match.group(0)
+
+    # revealPath yardımcı fonksiyonu zaten var mı?
+    has_reveal_path = "func revealPath(path string, selectFile bool) error" in content
+
+    if old_func in content and not has_reveal_path:
+        # Reveal fonksiyonunu ve yeni revealPath'i ekle
+        new_content = content.replace(old_func, DOWNLOAD_GO_REVEAL)
+        write(path, new_content)
+        MODIFIED.append("services/download.go (Reveal cross-platform)")
+        print("UPDATED : services/download.go")
+    elif has_reveal_path:
+        print("ALREADY : services/download.go (revealPath mevcut)")
+    else:
+        fail("Reveal fonksiyonu değiştirilemedi.")
+
+
+# --------------------------------------------------------------------------- #
+# main
+# --------------------------------------------------------------------------- #
+def main():
     global ROOT
     ROOT = find_project_root()
-    readme = ROOT / "README.md"
+    print(f"Project root: {ROOT}\n")
 
-    if not readme.exists():
-        fail(
-            "README.md bulunamadı.\n"
-            f"Dosya: {readme}\n"
-            "Önce create_github_readme.py scriptini çalıştırın."
-        )
+    print("=== Dockerfile.cross Go sürümü ===")
+    patch_dockerfile()
 
-    content = readme.read_text(encoding="utf-8")
+    print("\n=== DownloadService.Reveal cross-platform ===")
+    patch_download_reveal()
 
-    if START in content and END in content:
-        i = content.index(START)
-        j = content.index(END) + len(END)
-        new = content[:i] + SECTION + content[j:]
-        action = "mevcut cross-compile bölümü değiştirildi"
-    else:
-        if ANCHOR in content:
-            i = content.index(ANCHOR)
-            new = content[:i] + SECTION + "\n\n" + content[i:]
-        else:
-            new = content.rstrip() + "\n\n" + SECTION + "\n"
-        action = "cross-compile bölümü eklendi"
-
-    readme.write_text(new, encoding="utf-8")
-
-    # doğrulama
-    v = readme.read_text(encoding="utf-8")
-    if v.count(START) != 1 or v.count(END) != 1:
-        fail("Marker sayısı beklenenden farklı (bölüm çift yazılmış olabilir).")
-    for needle in ("task setup:docker", "GOOS=windows", "GOOS=linux", "build:server", "MSIX"):
-        if needle not in v:
-            fail(f"README doğrulaması başarısız, eksik içerik: {needle}")
-
-    print(f"UPDATED : README.md ({action})")
     print("\n=== UPDATE SUMMARY ===")
     print("Modified:")
-    print("  - README.md (cross-compile bölümü: Windows/Linux/ARM + server modu + MSIX notları)")
-    print("\nValidation:")
-    print("  - README marker ve içerik doğrulaması: PASS")
-    print("\nCompleted successfully.")
+    for m in MODIFIED:
+        print(f"  - {m}")
+
+    print("\nŞimdi cross-compile komutlarını tekrar çalıştırabilirsiniz:")
+    print("  GOOS=linux GOARCH=amd64 task build")
+    print("  GOOS=windows GOARCH=amd64 task build")
 
     print("\n=== GIT COMMIT MESSAGE ===")
     print(
-        "docs(readme): add cross-compilation guide for Windows and Linux targets\n"
+        "fix(cross-compile): upgrade Docker Go to 1.27 and cross-platform Reveal\n"
         "\n"
-        "- Document task setup:docker cross-compile image usage\n"
-        "- Add GOOS/GOARCH build & package commands for windows/linux amd64+arm64\n"
-        "- Note MSIX packaging restriction (Windows SDK tools) and CI alternative\n"
-        "- Note Linux CGO/WebKitGTK requirement and per-target runtime deps\n"
-        "- Document headless server-mode cross builds (build:server, build:docker)\n"
+        "- Update Dockerfile.cross from golang:1.26 to golang:1.27 (go.mod requirement)\n"
+        "- Make DownloadService.Reveal work on macOS, Windows, and Linux\n"
+        "- Add revealPath helper with platform-specific commands\n"
+        "- macOS: open / open -R\n"
+        "- Windows: explorer.exe / explorer.exe /select,\n"
+        "- Linux: xdg-open\n"
     )
 
 

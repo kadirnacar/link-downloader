@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=ytdlp-studio
+Exec=ytdlp-studio
+Icon=ytdlp-studio
+Categories=Development;
+Terminal=false
+Keywords=wails
+Version=1.0
+StartupNotify=false

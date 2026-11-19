@@ -283,26 +283,48 @@ func (d *DownloadService) ClearAll() {
 }
 
 func (d *DownloadService) Reveal(path string) error {
-	if runtime.GOOS != "darwin" {
-		return errors.New("bu özellik yalnızca macOS'ta destekleniyor")
-	}
 	if path == "" {
 		return errors.New("dosya yolu boş")
 	}
 	st, err := os.Stat(path)
 	switch {
 	case err == nil && st.IsDir():
-		return exec.Command("open", path).Run()
+		return revealPath(path, false)
 	case err == nil:
-		return exec.Command("open", "-R", path).Run()
+		return revealPath(path, true)
 	default:
 		dir := filepath.Dir(path)
 		if _, e := os.Stat(dir); e == nil {
-			return exec.Command("open", dir).Run()
+			return revealPath(dir, false)
 		}
 		return fmt.Errorf("dosya bulunamadı: %s", path)
 	}
 }
+
+func revealPath(path string, selectFile bool) error {
+	switch runtime.GOOS {
+	case "darwin":
+		if selectFile {
+			return exec.Command("open", "-R", path).Run()
+		}
+		return exec.Command("open", path).Run()
+	case "windows":
+		if selectFile {
+			return exec.Command("explorer.exe", "/select,", path).Run()
+		}
+		return exec.Command("explorer.exe", path).Run()
+	case "linux":
+		// xdg-open genellikle dizinleri ve dosyaları açabilir
+		if selectFile {
+			dir := filepath.Dir(path)
+			return exec.Command("xdg-open", dir).Run()
+		}
+		return exec.Command("xdg-open", path).Run()
+	default:
+		return fmt.Errorf("bu özellik %s platformunda desteklenmiyor", runtime.GOOS)
+	}
+}
+
 
 func (d *DownloadService) batchOf(taskID string) string {
 	d.mu.Lock()
