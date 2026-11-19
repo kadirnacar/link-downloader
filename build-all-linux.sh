@@ -19,12 +19,12 @@ HAS_DOCKER=0
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then HAS_DOCKER=1; fi
 
 # Native Linux GUI build için WebKitGTK dev paketleri (CGO) şart
-if ! pkg-config --exists webkit2gtk-4.1 2>/dev/null; then
+if ! pkg-config --exists gtk4 webkitgtk-6.0 libsoup-3.0 2>/dev/null; then
   echo "webkit2gtk-4.1 dev paketleri bulunamadı:"
-  echo "  Debian/Ubuntu: sudo apt install libwebkit2gtk-4.1-dev build-essential pkg-config"
-  echo "  Fedora:        sudo dnf install webkit2gtk4.1-devel pkg-config"
-  echo "  Arch:          sudo pacman -S webkit2gtk-4.1 pkg-config base-devel"
-  error "Native Linux build için WebKitGTK dev paketleri gerekli"
+  echo "  Debian/Ubuntu: sudo apt install libgtk-4-dev libwebkitgtk-6.0-dev libsoup-3.0-dev build-essential pkg-config"
+  echo "  Fedora:        sudo dnf install gtk4-devel webkitgtk6.0-devel libsoup3-devel pkg-config"
+  echo "  Arch:          sudo pacman -S gtk4 webkitgtk-6.0 libsoup3 pkg-config base-devel"
+  error "Wails v3 Linux build için GTK4 + WebKitGTK 6.0 + libsoup-3.0 dev paketleri gerekli"
 fi
 
 mkdir -p dist/linux-amd64 dist/linux-arm64 dist/windows-amd64 dist/windows-arm64

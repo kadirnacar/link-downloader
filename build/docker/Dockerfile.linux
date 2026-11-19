@@ -1,26 +1,33 @@
-# ytdlp-studio:dockerfile-linux v2
-# Dedicated Linux builder image for Wails v3 (Ubuntu 22.04 + WebKitGTK)
-# Used with `docker build --platform linux/amd64` on Apple Silicon.
-FROM ubuntu:22.04
+# ytdlp-studio:dockerfile-linux v3
+# Wails v3.0.0 Linux builder: GTK4 + WebKitGTK 6.0 + libsoup-3.0
+# Apple Silicon'da `docker build --platform linux/amd64` ile kullanilir (Rosetta).
+# Node/npm YOK: frontend host'ta derlenir, burada sadece `go build` calisir.
+FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV CGO_ENABLED=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    pkg-config \
     curl \
     ca-certificates \
     git \
-    libwebkit2gtk-4.1-dev \
-    pkg-config \
+    libgtk-4-dev \
+    libwebkitgtk-6.0-dev \
+    libsoup-3.0-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Go 1.27
-RUN curl -fsSL https://go.dev/dl/go1.27.3.linux-amd64.tar.gz | tar -C /usr/local -xz
+# Wails v3 Linux CGO gereksinimlerini derleme aninda dogrula
+RUN pkg-config --exists gtk4 webkitgtk-6.0 libsoup-3.0 gio-unix-2.0 glib-2.0 gobject-2.0 \
+    && pkg-config --modversion gtk4 webkitgtk-6.0 libsoup-3.0
+
+# Go 1.27 (go.mod gereksinimi)
+ARG GO_VERSION=1.27.3
+RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -C /usr/local -xz
 ENV PATH="/usr/local/go/bin:${PATH}"
+ENV GOMODCACHE=/go/pkg/mod
+ENV GOCACHE=/root/.cache/go-build
 
-# Install Node.js 20
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs
-
+LABEL ytdlp.builder="v3"
 WORKDIR /app
