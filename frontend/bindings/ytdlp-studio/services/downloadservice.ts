@@ -13,6 +13,10 @@ import * as model$0 from "../internal/model/models.js";
 // @ts-ignore: Unused imports
 import * as $models from "./models.js";
 
+export function Batches(): $CancellablePromise<$models.BatchProgress[] | null> {
+    return $Call.ByID(546918673);
+}
+
 export function Cancel(taskID: string): $CancellablePromise<void> {
     return $Call.ByID(4020361725, taskID);
 }
@@ -67,4 +71,11 @@ export function Retry(taskID: string): $CancellablePromise<void> {
 
 export function Reveal(path: string): $CancellablePromise<void> {
     return $Call.ByID(4248829118, path);
+}
+
+/**
+ * Snapshot UI'ın backend gerçeğiyle eşitlenmesini sağlar.
+ */
+export function Snapshot(): $CancellablePromise<$models.TaskProgress[] | null> {
+    return $Call.ByID(1227548555);
 }

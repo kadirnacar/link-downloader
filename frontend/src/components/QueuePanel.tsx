@@ -1,18 +1,75 @@
 // ytdlp-studio:generated v1
+// ytdlp-studio:queue v5
+import { useEffect, useState } from "react";
 import { DownloadService } from "../api";
 import { useStore } from "../store";
 import { useTasks } from "../taskStore";
 import { fmtEta, fmtSpeed, pct, STATE_LABEL, stateClass } from "../lib/format";
 
+type Pending = { text: string; run: () => void } | null;
+
 export function QueuePanel() {
   const tasks = useTasks((s) => s.tasks);
   const order = useTasks((s) => s.order);
+  const upsert = useTasks((s) => s.upsert);
   const removeOne = useTasks((s) => s.removeOne);
-  const clearFinished = useTasks((s) => s.clearFinished);
-  const clearAll = useTasks((s) => s.clearAll);
+  const clearFinishedLocal = useTasks((s) => s.clearFinished);
+  const clearAllLocal = useTasks((s) => s.clearAll);
   const batches = useStore((s) => s.batches);
-  const app = useStore((s) => s.app);
+  const upsertBatch = useStore((s) => s.upsertBatch);
+  const confirmClear = useStore((s) => s.app.confirmClearQueue);
+  const set = useStore((s) => s.set);
+  const [pending, setPending] = useState<Pending>(null);
+  const [busy, setBusy] = useState(false);
 
+  // Backend gerçeğiyle eşitle (kaçan event'leri telafi eder).
+  useEffect(() => {
+    void (async () => {
+      try {
+        const svc: any = DownloadService;
+        if (typeof svc.Snapshot === "function") {
+          const snap = await svc.Snapshot();
+          (snap ?? []).forEach((p: any) => upsert(p));
+        }
+        if (typeof svc.Batches === "function") {
+          const bs = await svc.Batches();
+          (bs ?? []).forEach((b: any) => upsertBatch(b));
+        }
+      } catch { /* yoksay */ }
+    })();
+  }, [upsert, upsertBatch]);
+
+  function has(name: string): boolean {
+    if (typeof (DownloadService as any)[name] !== "function") {
+      set({
+        notice:
+          `Backend'de "${name}" metodu yok. Bindings bayat: ` +
+          `'wails3 generate bindings -clean=true -ts -i' çalıştırıp uygulamayı yeniden başlatın.`,
+      });
+      return false;
+    }
+    return true;
+  }
+
+  async function call(name: string, fn: () => Promise<unknown>, after?: () => void) {
+    if (!has(name)) return;
+    setBusy(true);
+    try {
+      await fn();
+      after?.();
+    } catch (e) {
+      set({ notice: `${name} başarısız: ${String(e)}` });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function ask(text: string, run: () => void) {
+    if (confirmClear) setPending({ text, run });
+    else run();
+  }
+
+  const svc: any = DownloadService;
   const ids = new Set<string>();
   order.forEach((id) => { const b = tasks[id]?.batchId; if (b) ids.add(b); });
   const list = [...ids].map((id) => batches[id]).filter(Boolean);
@@ -24,25 +81,63 @@ export function QueuePanel() {
   const percent = total > 0 ? (current / total) * 100 : 0;
   const finished = list.length > 0 && list.every((b) => b.done);
 
-  async function clear(kind: "finished" | "all") {
-    if (app.confirmClearQueue && !window.confirm(kind === "all" ? "Tüm kuyruk temizlensin mi?" : "Bitenler temizlensin mi?")) return;
-    if (kind === "all") { await DownloadService.ClearAll(); clearAll(); }
-    else { await DownloadService.ClearFinished(); clearFinished(); }
+  if (order.length === 0) {
+    return <section className="card empty">Kuyruk boş. Analiz ekranından indirme başlatın.</section>;
   }
-
-  if (order.length === 0) return <section className="card empty">Kuyruk boş. Analiz ekranından indirme başlatın.</section>;
 
   return (
     <section className="queue-panel">
       <div className="card queue-summary">
         <div className="card-head">
-          <h3>{finished ? (failed > 0 ? `Tamamlandı · ${done} başarılı, ${failed} hatalı` : "✓ İndirme tamamlandı") : `İndiriliyor · ${current}/${total}`}</h3>
+          <h3>
+            {finished
+              ? failed > 0
+                ? `Tamamlandı · ${done} başarılı, ${failed} hatalı`
+                : "✓ İndirme tamamlandı"
+              : `İndiriliyor · ${current}/${total}`}
+          </h3>
           <div className="inline">
-            <button className="btn small" onClick={() => void DownloadService.PauseAll()}>Tümünü duraklat</button>
-            <button className="btn small" onClick={() => void DownloadService.ResumeAll()}>Tümünü sürdür</button>
-            <button className="btn small danger" onClick={() => void DownloadService.CancelAll()}>Tümünü iptal</button>
-            <button className="btn small" onClick={() => void clear("finished")}>Bitenleri temizle</button>
-            <button className="btn small" onClick={() => void clear("all")}>Tümünü temizle</button>
+            <button className="btn small" disabled={busy}
+              onClick={() => void call("PauseAll", () => svc.PauseAll(), () => {
+                order.forEach((id) => {
+                  const t = tasks[id];
+                  if (t && (t.state === "queued" || t.state === "downloading" || t.state === "converting")) {
+                    upsert({ taskId: id, state: "paused", percent: t.percent, speedBps: 0, etaSec: 0 });
+                  }
+                });
+              })}>Tümünü duraklat</button>
+
+            <button className="btn small" disabled={busy}
+              onClick={() => void call("ResumeAll", () => svc.ResumeAll(), () => {
+                order.forEach((id) => {
+                  const t = tasks[id];
+                  if (t && (t.state === "paused" || t.state === "error" || t.state === "canceled")) {
+                    upsert({ taskId: id, state: "queued", percent: 0, speedBps: 0, etaSec: 0 });
+                  }
+                });
+              })}>Tümünü sürdür</button>
+
+            <button className="btn small danger" disabled={busy}
+              onClick={() => ask("Tüm görevler iptal edilsin mi?", () => {
+                void call("CancelAll", () => svc.CancelAll(), () => {
+                  order.forEach((id) => {
+                    const t = tasks[id];
+                    if (t && t.state !== "done") {
+                      upsert({ taskId: id, state: "canceled", percent: t.percent, speedBps: 0, etaSec: 0 });
+                    }
+                  });
+                });
+              })}>Tümünü iptal</button>
+
+            <button className="btn small" disabled={busy}
+              onClick={() => ask("Biten görevler temizlensin mi?", () => {
+                void call("ClearFinished", () => svc.ClearFinished(), clearFinishedLocal);
+              })}>Bitenleri temizle</button>
+
+            <button className="btn small" disabled={busy}
+              onClick={() => ask("Tüm kuyruk temizlensin mi? Aktif indirmeler iptal edilir.", () => {
+                void call("ClearAll", () => svc.ClearAll(), clearAllLocal);
+              })}>Tümünü temizle</button>
           </div>
         </div>
         <div className="meter"><span style={{ width: pct(percent) + "%" }} /></div>
@@ -54,20 +149,48 @@ export function QueuePanel() {
           const t = tasks[id];
           if (!t) return null;
           const active = t.state === "queued" || t.state === "downloading" || t.state === "converting";
-          const finishedTask = t.state === "done" || t.state === "error" || t.state === "canceled";
+          const terminal = t.state === "done" || t.state === "error" || t.state === "canceled";
           return (
             <div key={id} className="task">
               <div className="task-line">
                 <span className="title">{t.title || id}</span>
                 <span className={stateClass(t.state)}>{STATE_LABEL[t.state] ?? t.state}</span>
-                {t.state === "downloading" && <span className="meta">{fmtSpeed(t.speedBps)} · {fmtEta(t.etaSec)}</span>}
+                {t.state === "downloading" && (
+                  <span className="meta">{fmtSpeed(t.speedBps)} · {fmtEta(t.etaSec)}</span>
+                )}
                 <span className="task-btns">
-                  {active && <button className="btn small" onClick={() => void DownloadService.Pause(id)}>Duraklat</button>}
-                  {t.state === "paused" && <button className="btn small" onClick={() => void DownloadService.Resume(id)}>Devam</button>}
-                  {(active || t.state === "paused") && <button className="btn small danger" onClick={() => void DownloadService.Cancel(id)}>İptal</button>}
-                  {(t.state === "error" || t.state === "canceled") && <button className="btn small" onClick={() => void DownloadService.Retry(id)}>Yeniden</button>}
-                  {t.state === "done" && <button className="btn small" onClick={() => void DownloadService.Reveal(t.filePath ?? "")}>Klasörde göster</button>}
-                  {finishedTask && <button className="btn small ghost" onClick={async () => { await DownloadService.Remove(id); removeOne(id); }}>Sil</button>}
+                  {active && (
+                    <button className="btn small" disabled={busy}
+                      onClick={() => void call("Pause", () => svc.Pause(id), () =>
+                        upsert({ taskId: id, state: "paused", percent: t.percent, speedBps: 0, etaSec: 0 })
+                      )}>Duraklat</button>
+                  )}
+                  {t.state === "paused" && (
+                    <button className="btn small" disabled={busy}
+                      onClick={() => void call("Resume", () => svc.Resume(id), () =>
+                        upsert({ taskId: id, state: "queued", percent: 0, speedBps: 0, etaSec: 0 })
+                      )}>Devam</button>
+                  )}
+                  {(active || t.state === "paused") && (
+                    <button className="btn small danger" disabled={busy}
+                      onClick={() => void call("Cancel", () => svc.Cancel(id), () =>
+                        upsert({ taskId: id, state: "canceled", percent: t.percent, speedBps: 0, etaSec: 0 })
+                      )}>İptal</button>
+                  )}
+                  {(t.state === "error" || t.state === "canceled") && (
+                    <button className="btn small" disabled={busy}
+                      onClick={() => void call("Retry", () => svc.Retry(id), () =>
+                        upsert({ taskId: id, state: "queued", percent: 0, speedBps: 0, etaSec: 0 })
+                      )}>Yeniden</button>
+                  )}
+                  {t.state === "done" && (
+                    <button className="btn small" disabled={busy}
+                      onClick={() => void call("Reveal", () => svc.Reveal(t.filePath ?? ""))}>Klasörde göster</button>
+                  )}
+                  {terminal && (
+                    <button className="btn small ghost" disabled={busy}
+                      onClick={() => void call("Remove", () => svc.Remove(id), () => removeOne(id))}>Sil</button>
+                  )}
                 </span>
               </div>
               <div className={"bar " + t.state}><div className="fill" style={{ width: pct(t.percent) + "%" }} /></div>
@@ -76,6 +199,21 @@ export function QueuePanel() {
           );
         })}
       </div>
+
+      {pending && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal card">
+            <div className="card-head"><h3>Onay</h3></div>
+            <p className="hint">{pending.text}</p>
+            <div className="inline modal-actions">
+              <button className="btn" onClick={() => setPending(null)}>Vazgeç</button>
+              <button className="btn primary" onClick={() => { const r = pending.run; setPending(null); r(); }}>
+                Onayla
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

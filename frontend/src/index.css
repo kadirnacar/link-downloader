@@ -250,3 +250,14 @@ select option{background:var(--panel);color:var(--text)}
 .task-btns .btn{height:var(--ctl-h-sm);min-height:var(--ctl-h-sm)}
 .console{font-size:11px}
 /* ytdlp-studio:input-unify v1:end */
+
+/* ytdlp-studio:queue-modal v1 */
+.modal-backdrop{
+  position:fixed;inset:0;z-index:120;display:grid;place-items:center;
+  background:color-mix(in srgb,#000 55%,transparent);backdrop-filter:blur(2px);
+}
+.modal{width:min(420px,calc(100vw - 32px))}
+.modal-actions{justify-content:flex-end;margin-top:12px}
+.queue-summary .inline{gap:6px}
+.task-btns .btn:disabled{opacity:.5}
+/* ytdlp-studio:queue-modal v1:end */
