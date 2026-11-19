@@ -80,6 +80,11 @@ wails3 build
 task build
 ```
 
+#### Windows
+```bash
+GOOS=windows GOARCH=amd64 wails3 build
+```
+
 ### macOS paketleme (.app)
 ```bash
 task package
@@ -141,6 +146,78 @@ Seçenekler kalıcı olarak şu dosyada saklanır:
     ├── src/                   # React uygulaması (store, componentler)
     └── bindings/              # Wails tarafından üretilen TS binding'leri
 ```
+
+<!-- ytdlp-studio:xcompile v1 -->
+## 🌍 Cross-Compile (macOS → Windows / Linux)
+
+Wails v3, kök `Taskfile.yml` üzerindeki `GOOS` değişkeni ile görevleri platform
+Taskfile'lerine dispatch eder (`windows:`, `linux:`, `darwin:`…). Host işletim
+sisteminden farklı bir hedef seçildiğinde derleme, `task setup:docker` ile kurulan
+cross-compile Docker imajı içinde gerçekleştirilir.
+
+### Ön hazırlık (tek seferlik)
+
+```bash
+task setup:docker     # ~800 MB cross-compile imajı (Linux/Windows araç zincirleri)
+wails3 doctor         # ortam doğrulaması
+```
+
+### Windows hedefi (macOS üzerinden)
+
+```bash
+# Derleme (portable EXE)
+GOOS=windows GOARCH=amd64 task build
+# eşdeğeri:
+wails3 build GOOS=windows GOARCH=amd64
+# çıktı: bin/ytdlp-studio.exe
+```
+
+- Windows hedefi CGO gerektirmez; hedef makinede **WebView2 Runtime** bulunmalıdır.
+- **Paketleme (MSIX):** `makeappx`/`signtool` gibi Windows SDK araçları gerektirir, macOS'ta
+  üretilemez. MSIX için bir Windows makinesinde veya CI'da (GitHub Actions `windows-latest`)
+  `task install:msix:tools` + `task package` çalıştırın; ya da `bin/ytdlp-studio.exe`
+  dosyasını portable olarak dağıtın.
+
+### Linux hedefi (macOS üzerinden)
+
+```bash
+# Derleme
+GOOS=linux GOARCH=amd64 task build
+# Paketleme (çıktı yolu için build/linux/Taskfile.yml / task --list-all)
+GOOS=linux GOARCH=amd64 task package
+```
+
+- Linux GUI hedefi CGO + WebKitGTK başlıkları gerektirdiğinden **Docker imajı zorunludur**
+  (`task setup:docker`).
+- Hedef makinede `libwebkit2gtk-4.1` çalışma zamanı kütüphaneleri bulunmalıdır.
+
+### Mimari varyantları
+
+```bash
+GOOS=linux GOARCH=arm64 task build      # örn. Raspberry Pi / ARM sunucu
+GOOS=windows GOARCH=arm64 task build    # Windows on ARM
+```
+
+### Headless / server modu (GUI'siz, CGO'suz)
+
+```bash
+GOOS=linux GOARCH=amd64 task build:server   # yalnızca HTTP sunucu
+task build:docker                            # server modu için Docker imajı
+task run:docker                              # imajı çalıştır
+```
+
+Server modu WebKit/CGO gerektirmez; düz Go cross-compile ile her platforma üretilebilir.
+
+### Cross-compile notları
+
+- Frontend (`frontend/dist`) platformdan bağımsızdır ve binary'ye gömülür (`//go:embed`).
+- yt-dlp / ffmpeg / ffprobe / bun, hedef platforma uygun sürümleriyle **çalışma zamanında**
+  otomatik indirilir; cross-build imajına dahil etmenize gerek yoktur.
+- `DownloadService.Reveal` ("Finder'da göster") şu an yalnızca macOS'ta çalışır;
+  Windows/Linux hedeflerinde hata döner.
+- CI önerisi: matrix kullanarak `windows-latest` üzerinde `task package` (MSIX dahil),
+  `ubuntu-latest` + Docker imajı ile `GOOS=linux task build/package`.
+<!-- ytdlp-studio:xcompile v1:end -->
 
 ## 🧯 Sorun Giderme
 
