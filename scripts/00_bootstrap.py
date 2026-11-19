@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-# 00_bootstrap.py — proje root tespiti + gerekirse Wails v3 react-ts iskeleti.
+# ytdlp-studio:bootstrap-fix-v1
+# 00_bootstrap.py — proje root tespiti + gerekirse Wails v3 react (TypeScript) iskeleti.
 import shutil
+import sys
 from pathlib import Path
 
 from _common import (Fail, Report, base_parser, die, ensure_tool, ensure_wails3,
@@ -32,7 +34,28 @@ def main():
         ensure_tool("node", "node")
         ensure_tool("npm", "node")
         wails = ensure_wails3()
-        run([wails, "init", "-n", "ytdlp-studio", "-t", "react-ts"], cwd=parent, env=go_env())
+        init_ok = False
+        last_out = ""
+        for tpl in ("react", "react-ts"):
+            target = parent / "ytdlp-studio"
+            if target.exists():
+                if is_project_root(target):
+                    init_ok = True
+                    break
+                if any(target.iterdir()):
+                    die(f"ERROR:\nHedef dizin dolu ama proje değil: {target}\nİçeriği inceleyin; otomatik silme yapılmadı.")
+                target.rmdir()
+            res = run([wails, "init", "-n", "ytdlp-studio", "-t", tpl], cwd=parent, env=go_env(), check=False)
+            last_out = (res.stdout or "") + (res.stderr or "")
+            if res.returncode == 0:
+                init_ok = True
+                break
+            if "invalid remote git URL" not in last_out and "invalid template" not in last_out:
+                sys.stdout.write(last_out)
+                die(f"wails3 init başarısız (template={tpl}). Çıktı yukarıda.")
+        if not init_ok:
+            sys.stdout.write(last_out)
+            die("Yerleşik React şablonu bulunamadı. 'wails3 init -l' ile şablon adlarını kontrol edin.")
         root = parent / "ytdlp-studio"
         if not is_project_root(root):
             die(f"ERROR:\nwails3 init sonrası proje yapısı doğrulanamadı: {root}\n"
