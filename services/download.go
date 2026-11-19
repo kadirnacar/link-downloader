@@ -185,12 +185,12 @@ func (d *DownloadService) run(t downloadTask) {
 			state = "converting"
 			pct = 100
 		}
-		
+
 		eta := 0.0
 		if p.ETA != nil {
 			eta = p.ETA().Seconds()
 		}
-		
+
 		d.emit(TaskProgress{TaskID: t.id, State: state, Percent: pct, Speed: 0, ETA: eta})
 	})
 

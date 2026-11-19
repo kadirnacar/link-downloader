@@ -51,82 +51,89 @@ func (s *AnalyzeService) ParseURL(raw string) (model.ParsedURL, error) {
 	return p, nil
 }
 
+// ytdlp-studio:playlist-all-analyze v2
 func (s *AnalyzeService) Analyze(raw, scope string) (*model.MediaInfo, error) {
 	p, err := s.ParseURL(raw)
 	if err != nil {
 		return nil, err
 	}
+
 	target := p.CanonicalURL
+	wantPlaylist := false
+
 	switch {
 	case p.Kind == "playlist" || (p.Ambiguous && scope == "playlist"):
 		target = "https://www.youtube.com/playlist?list=" + p.ListID
+		wantPlaylist = true
 	case p.VideoID != "":
 		target = "https://www.youtube.com/watch?v=" + p.VideoID
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
+
 	infos, _, err := engine.NewCommand().FlatPlaylist().ExtractInfo(ctx, target)
 	if err != nil {
 		return nil, fmt.Errorf("içerik analizi başarısız: %w", err)
 	}
-	if len(infos) == 0 || infos[0] == nil {
+	if len(infos) == 0 {
 		return nil, errors.New("içerik bulunamadı")
 	}
-	info := infos[0]
+
+	entries := plAllDedupe(plAllFlatten(infos))
+	if len(entries) == 0 {
+		return nil, errors.New("içerik bulunamadı")
+	}
+
+	kind := "video"
+	id := p.VideoID
 	title := ""
-	if info.Title != nil {
-		title = *info.Title
+
+	if wantPlaylist || p.Kind == "playlist" || len(entries) > 1 || plAllHasEntries(infos[0]) {
+		kind = "playlist"
+		id = p.ListID
+		title = plAllPlaylistTitle(infos, p.ListID)
+
+		if id == "" {
+			id = plAllString(infos[0], "PlaylistID", "")
+		}
+		if id == "" && len(entries) > 0 {
+			id = plAllString(entries[0], "PlaylistID", "")
+		}
+		if id == "" {
+			id = "playlist"
+		}
+	} else {
+		id = plAllString(infos[0], "ID", p.VideoID)
+		title = plAllString(infos[0], "Title", "")
 	}
-	out := &model.MediaInfo{Kind: "video", ID: info.ID, Title: title}
-	entries := []*ytdlp.ExtractedInfo{info}
-	if len(info.Entries) > 0 {
-		out.Kind, entries = "playlist", info.Entries
+
+	if title == "" {
+		title = plAllFirstTitle(entries)
 	}
+	if title == "" {
+		title = id
+	}
+
+	out := &model.MediaInfo{Kind: kind, ID: id, Title: title}
+
 	for i, e := range entries {
 		if e == nil {
 			continue
 		}
-		webpageURL := ""
-		if e.WebpageURL != nil {
-			webpageURL = *e.WebpageURL
-		}
-		titleStr := ""
-		if e.Title != nil {
-			titleStr = *e.Title
-		}
-		duration := 0.0
-		if e.Duration != nil {
-			duration = *e.Duration
-		}
-		available := true
-		if e.Title != nil && (*e.Title == "[Private video]" || *e.Title == "[Deleted video]") {
-			available = false
-		}
 
-		me := model.MediaEntry{
-			ID:          e.ID,
-			URL:         webpageURL,
-			Title:       titleStr,
-			DurationSec: duration,
-			Index:       i + 1,
-			Available:   available,
-		}
-		if me.URL == "" {
-			me.URL = "https://www.youtube.com/watch?v=" + e.ID
+		me := plAllEntry(i+1, e)
+		if me.URL == "" && me.ID != "" {
+			me.URL = "https://www.youtube.com/watch?v=" + me.ID
 		}
 		me.Thumbnail = thumbOf(e)
 		out.Entries = append(out.Entries, me)
 	}
+
 	return out, nil
 }
 
+// ytdlp-studio:playlist-all-thumb v2
 func thumbOf(e *ytdlp.ExtractedInfo) string {
-	if len(e.Thumbnails) > 0 {
-		return e.Thumbnails[len(e.Thumbnails)-1].URL
-	}
-	if len(e.ID) == 11 {
-		return "https://i.ytimg.com/vi/" + e.ID + "/hqdefault.jpg"
-	}
-	return ""
+	return plAllThumbnail(e)
 }
