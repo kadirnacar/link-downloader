@@ -1,15 +1,27 @@
 {
-	"fixed": {
-		"file_version": "0.1.0"
-	},
-	"info": {
-		"0409": {
-			"ProductVersion": "0.1.0",
-			"CompanyName": "My Company",
-			"FileDescription": "A ytdlp-studio application",
-			"LegalCopyright": "© 2026, My Company",
-			"ProductName": "My Product",
-			"Comments": "This is a comment"
-		}
-	}
+  "fixed": {
+    "file_version": "0.1.0"
+  },
+  "info": {
+    "0409": {
+      "ProductVersion": "0.1.0",
+      "CompanyName": "My Company",
+      "FileDescription": "A ytdlp-studio application",
+      "LegalCopyright": "© 2026, My Company",
+      "ProductName": "My Product",
+      "Comments": "This is a comment"
+    }
+  },
+  "StringFileInfo": {
+    "CompanyName": "Bengsoft",
+    "FileDescription": "ytdlp-studio · yt-dlp indirme stüdyosu",
+    "FileVersion": "1.0.0",
+    "InternalName": "ytdlp-studio",
+    "LegalCopyright": "© 2026 Bengsoft · Kadir Niyazi AÇAR",
+    "LegalTrademarks": "Bengsoft",
+    "OriginalFilename": "ytdlp-studio.exe",
+    "ProductName": "ytdlp-studio",
+    "ProductVersion": "1.0.0",
+    "Comments": "Kadir Niyazi AÇAR · kadirnacar@kadirnacar.com"
+  }
 }

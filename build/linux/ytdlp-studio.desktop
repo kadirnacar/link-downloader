@@ -1,10 +1,15 @@
+# ytdlp-studio:desktop v2
 [Desktop Entry]
 Type=Application
 Name=ytdlp-studio
+GenericName=Media Downloader
+Comment=yt-dlp tabanlı ses, video ve altyazı indirme stüdyosu
 Exec=ytdlp-studio
 Icon=ytdlp-studio
-Categories=Development;
 Terminal=false
-Keywords=wails
-Version=1.0
-StartupNotify=false
+Categories=AudioVideo;Network;Utility;
+Keywords=youtube;yt-dlp;download;mp3;subtitle;
+StartupWMClass=ytdlp-studio
+X-Developer=Kadir Niyazi AÇAR
+X-Developer-Email=kadirnacar@kadirnacar.com
+X-Vendor=Bengsoft
