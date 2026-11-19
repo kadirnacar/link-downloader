@@ -1,59 +1,157 @@
-# Welcome to Your New Wails3 Project!
 
-Congratulations on generating your Wails3 application! This README will guide you through the next steps to get your project up and running.
+# ytdlp-studio 🎧
 
-## Getting Started
+YouTube video ve playlist'lerinden ses/video indirmek için tasarlanmış masaüstü stüdyosu.
+[Wails v3](https://wails.io) üzerinde Go backend + React/TypeScript frontend ile geliştirilmiştir;
+indirme motoru olarak [yt-dlp](https://github.com/yt-dlp/yt-dlp) ve ffmpeg kullanır.
 
-1. Navigate to your project directory in the terminal.
+![ytdlp-studio analiz ekranı](docs/screenshot.png)
 
-2. To run your application in development mode, use the following command:
+---
 
-   ```
-   wails3 dev
-   ```
+## ✨ Özellikler
 
-   This will start your application and enable hot-reloading for both frontend and backend changes.
+- 🔗 **Akıllı URL analizi** — video, playlist, shorts, live ve mix URL'lerini otomatik ayrıştırır.
+- 📋 **Playlist önizleme** — tüm öğeler kapak görseli, sıra no ve süre ile listelenir; arama + toplu seçim.
+- 🎵 **Ses / Video kuralları** — MP3/M4A/OPUS/FLAC/WAV + kalite; video için çözünürlük ve kap (mp4/mkv/webm).
+- 📁 **Dosya adı şablonları** — `%(playlist_index)03d - %(title)s.%(ext)s` vb.; playlist indeksi uygulama
+  tarafında gerçek sıra numarasıyla doldurulur (dosya adında `NA`/`000` oluşmaz).
+- ⬇️ **Çok iş parçacıklı kuyruk** — 3 eşzamanlı indirme worker'ı.
+- ⏯️ **Görev kontrolleri** — Duraklat, Devam, İptal, Yeniden dene, Finder'da göster, Tekil sil.
+- 🧹 **Toplu işlemler** — Tümünü iptal et, Bitenleri temizle, Tümünü temizle.
+- 📊 **Canlı ilerleme** — dosya bazında yüzde/hız/ETA; playlist bazında toplam ilerleme
+  (başarısız öğeler de ilerlemeye dahil) ve işlem bitince toast bildirimi.
+- 🧰 **Bağımlılık yönetimi** — yt-dlp / ffmpeg / ffprobe / JS runtime eksikse uygulama içinden
+  tek tıkla otomatik kurulum; "yt-dlp Güncelle" ile sürüm tazeleme.
+- 💾 **Kalıcı ayarlar** — seçenekler OS kullanıcı yapılandırma dizininde saklanır.
 
-3. To build your application for production, use:
+## 🧱 Teknoloji Yığını
 
-   ```
-   wails3 build
-   ```
+| Katman          | Teknoloji                                    |
+| --------------- | -------------------------------------------- |
+| Masaüstü kabuk  | Wails v3 (native webview)                    |
+| Backend         | Go 1.27, [go-ytdlp](https://github.com/lrstanley/go-ytdlp) |
+| Frontend        | React 18, TypeScript, Zustand, Vite          |
+| İndirme motoru  | yt-dlp + ffmpeg / ffprobe                    |
 
-   This will create a production-ready executable in the `build` directory.
+## 📦 Gereksinimler
 
-## Exploring Wails3 Features
+- macOS (geliştirme hedefi; Wails v3 çoklu platform destekler)
+- Go **≥ 1.27**
+- Node.js **≥ 18** + npm
+- Wails v3 CLI:
+  ```bash
+  go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+  ```
+- yt-dlp / ffmpeg / ffprobe: **zorunlu değil** — uygulama ilk açılışta eksikleri otomatik kurabilir.
 
-Now that you have your project set up, it's time to explore the features that Wails3 offers:
+---
 
-1. **Check out the examples**: The best way to learn is by example. Visit the `examples` directory in the `v3/examples` directory to see various sample applications.
+## 🚀 Kurulum
 
-2. **Run an example**: To run any of the examples, navigate to the example's directory and use:
+```bash
+# 1) Depoyu klonla
+git clone https://github.com/KULLANICI_ADI/link-downloader.git
+cd link-downloader
 
-   ```
-   go run .
-   ```
+# 2) Go bağımlılıklarını çöz
+go mod tidy
 
-   Note: Some examples may be under development during the alpha phase.
+# 3) Frontend bağımlılıklarını kur
+cd frontend && npm install && cd ..
 
-3. **Explore the documentation**: Visit the [Wails3 documentation](https://v3.wails.io/) for in-depth guides and API references.
+# 4) Wails TypeScript binding'lerini üret
+wails3 generate bindings -clean=true -ts -i
+```
 
-4. **Join the community**: Have questions or want to share your progress? Join the [Wails Discord](https://discord.gg/JDdSxwjhGf) or visit the [Wails discussions on GitHub](https://github.com/wailsapp/wails/discussions).
+## 🔨 Derleme
 
-## Project Structure
+### Geliştirme modu (hot-reload)
+```bash
+wails3 dev
+# veya
+task dev
+```
 
-Take a moment to familiarize yourself with your project structure:
+### Üretim derlemesi
+```bash
+wails3 build
+# veya
+task build
+```
 
-- `frontend/`: Contains your frontend code (HTML, CSS, JavaScript/TypeScript)
-- `main.go`: The entry point of your Go backend
-- `app.go`: Define your application structure and methods here
-- `wails.json`: Configuration file for your Wails project
+### macOS paketleme (.app)
+```bash
+task package
+```
 
-## Next Steps
+### Testler
+```bash
+go test ./...
+cd frontend && npm run build:dev
+```
 
-1. Modify the frontend in the `frontend/` directory to create your desired UI.
-2. Add backend functionality in `main.go`.
-3. Use `wails3 dev` to see your changes in real-time.
-4. When ready, build your application with `wails3 build`.
+---
 
-Happy coding with Wails3! If you encounter any issues or have questions, don't hesitate to consult the documentation or reach out to the Wails community.
+## 🖥️ Kullanım
+
+1. **URL yapıştır** — Analiz sekmesindeki kutuya YouTube bağlantısını yapıştır
+   (yapıştırınca analiz otomatik başlar) ya da `Enter` / **Analiz Et** düğmesini kullan.
+2. **Kapsam seç** — URL hem video hem playlist içeriyorsa *Sadece video / Tüm playlist* seçicisi görünür.
+3. **Öğeleri seç** — Önizleme listesinde arama yap; tek tek veya başlıktaki checkbox ile tümünü işaretle.
+   Private/silinmiş öğeler pasif gösterilir ve seçilemez.
+4. **Kuralları ayarla** — Sağ panelden Ses/Video modu, format, kalite, çıktı klasörü ve dosya adı şablonunu belirle.
+   "Gelişmiş" bölümünde hız limiti, eşzamanlı parça sayısı ve çerez kaynağı bulunur.
+5. **İndir** — `⬇ N öğeyi indir` düğmesi kuyruğu başlatır ve otomatik olarak Kuyruk sekmesine geçer.
+6. **Kuyruğu yönet** — Her görev satırında: Duraklat / Devam / İptal / Yeniden / Finder'da göster / Sil.
+   Üst çubukta: *Tümünü iptal et*, *Bitenleri temizle*, *Tümünü temizle*.
+7. **Playlist ilerlemesini izle** — Kuyruk üstündeki özet kartı `tamamlanan/toplam` ve yüzde ilerlemeyi gösterir;
+   başarısız öğeler ilerlemeye dahil edilir, işlem bitince sağ altta toast bildirimi çıkar.
+
+### Dosya adı şablonları
+| Şablon | Açıklama |
+| --- | --- |
+| `%(playlist_index)03d - %(title)s.%(ext)s` | Varsayılan; playlistte `001 - Şarkı.mp3` üretir |
+| `%(title)s.%(ext)s` | İndeksiz sade ad |
+| `%(uploader)s/%(title)s.%(ext)s` | Kanal adıyla alt klasör |
+
+> Playlist indeksi uygulama tarafından doldurulur; tekil video indirmelerinde indeks parçası otomatik kaldırılır.
+
+## ⚙️ Ayarlar
+
+Seçenekler kalıcı olarak şu dosyada saklanır:
+
+- macOS: `~/Library/Application Support/ytdlp-studio/settings.json`
+
+## 🗂️ Proje Yapısı
+
+```
+.
+├── main.go                    # Wails uygulaması + servis kayıtları
+├── internal/
+│   ├── engine/builder.go      # yt-dlp komut satırı kurulumu + şablon çözümü
+│   └── model/                 # Ortak modeller ve doğrulama (options, media)
+├── services/
+│   ├── analyze.go             # URL ayrıştırma + playlist analizi
+│   ├── download.go            # Kuyruk, pause/resume, batch ilerleme, olaylar
+│   ├── deps.go                # yt-dlp/ffmpeg/ffprobe kurulumu ve güncelleme
+│   ├── settings.go            # Kalıcı ayarlar servisi
+│   └── events.go              # Wails özel olay kayıtları
+└── frontend/
+    ├── src/                   # React uygulaması (store, componentler)
+    └── bindings/              # Wails tarafından üretilen TS binding'leri
+```
+
+## 🧯 Sorun Giderme
+
+| Sorun | Çözüm |
+| --- | --- |
+| "Eksik bileşenler" bandı görünüyor | Banttaki **Otomatik Kur** düğmesini kullanın |
+| İndirme hataları / yaşlı yt-dlp | Üst çubuktan **yt-dlp Güncelle** |
+| TS binding hataları | `wails3 generate bindings -clean=true -ts -i` komutunu yeniden çalıştırın |
+| Kuyruk takıldı | Görev satırındaki **İptal** ardından **Yeniden** düğmesini kullanın |
+
+## ⚖️ Yasal Uyarı
+
+Bu araç kişisel kullanım amaçlıdır. Telif hakkıyla korunan içerikleri indirmeden önce
+ilgili platformun hizmet şartlarını ve yerel yasaları kontrol etmek kullanıcının sorumluluğundadır.
