@@ -1,7 +1,7 @@
 # ytdlp-studio:dockerfile-linux v3
 # Wails v3.0.0 Linux builder: GTK4 + WebKitGTK 6.0 + libsoup-3.0
 # Apple Silicon'da `docker build --platform linux/amd64` ile kullanilir (Rosetta).
-# Node/npm YOK: frontend host'ta derlenir, burada sadece `go build` calisir.
+# Frontend host'ta derlenir; bu imaj sadece `go build` calistirir.
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsoup-3.0-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Wails v3 Linux CGO gereksinimlerini derleme aninda dogrula
+# Wails v3 Linux CGO gereksinimlerini imaj build aninda dogrula
 RUN pkg-config --exists gtk4 webkitgtk-6.0 libsoup-3.0 gio-unix-2.0 glib-2.0 gobject-2.0 \
     && pkg-config --modversion gtk4 webkitgtk-6.0 libsoup-3.0
 

@@ -18,7 +18,7 @@ docker info >/dev/null 2>&1       || error "Docker çalışmıyor"
 mkdir -p bin dist/macos dist/windows-amd64 dist/windows-arm64 dist/linux-amd64
 
 echo ""
-echo "1/7 · Frontend bağımlılıkları + production build (host)..."
+echo "1/7 · Frontend production build (host)..."
 if [ ! -d "frontend/node_modules" ]; then
   (cd frontend && npm install --no-audit --no-fund)
 fi
@@ -65,6 +65,11 @@ docker run --rm --platform linux/amd64 \
   || error "Linux amd64 build başarısız"
 cp -f bin/ytdlp-studio-linux-amd64 dist/linux-amd64/ytdlp-studio
 chmod +x dist/linux-amd64/ytdlp-studio
+if command -v file >/dev/null 2>&1; then
+  file dist/linux-amd64/ytdlp-studio | grep -q "ELF 64-bit" \
+    && success "Linux binary ELF 64-bit olarak doğrulandı" \
+    || warn "Linux binary mimarisi doğrulanamadı"
+fi
 success "Linux amd64 → dist/linux-amd64/ytdlp-studio"
 
 echo ""
