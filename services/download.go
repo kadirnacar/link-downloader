@@ -37,6 +37,7 @@ type BatchProgress struct {
 	Completed int    `json:"completed"`
 	Current   int    `json:"current"`
 	Failed    int    `json:"failed"`
+	Done      bool   `json:"done"`
 }
 
 type downloadTask struct {
@@ -203,7 +204,7 @@ func (d *DownloadService) run(t downloadTask) {
 	lastFile := ""
 
 	started := time.Now()
-	cmd := engine.BuildCommand(t.opts).ProgressFunc(300*time.Millisecond, func(p ytdlp.ProgressUpdate) {
+	cmd := engine.BuildCommand(t.opts, t.entry).ProgressFunc(300*time.Millisecond, func(p ytdlp.ProgressUpdate) {
 		fm.Lock()
 		if p.Filename != "" {
 			lastFile = p.Filename
@@ -276,7 +277,7 @@ func (d *DownloadService) run(t downloadTask) {
 	}
 }
 
-func (d *DownloadService) recordBatchResult(batchID string, ok bool) {
+func (d *DownloadService) recordBatchResult(batchID string, success bool) {
 	d.mu.Lock()
 	batch := d.batches[batchID]
 	d.mu.Unlock()
@@ -284,28 +285,54 @@ func (d *DownloadService) recordBatchResult(batchID string, ok bool) {
 		return
 	}
 	batch.mu.Lock()
-	if ok {
+	if success {
 		batch.completed++
 	} else {
 		batch.failed++
 	}
+	batch.current = batch.completed + batch.failed
+	done := batch.current >= batch.total
 	batch.mu.Unlock()
+
 	d.emitBatch(batchID, batch)
+
+	if done {
+		d.emitBatchCompleted(batchID, batch)
+	}
 }
 
 func (d *DownloadService) emitBatch(batchID string, batch *batchState) {
 	batch.mu.Lock()
+	done := batch.current >= batch.total
 	p := BatchProgress{
 		BatchID:   batchID,
 		Total:     batch.total,
 		Completed: batch.completed,
-		Current:   batch.completed + batch.failed,
+		Current:   batch.current,
 		Failed:    batch.failed,
+		Done:      done,
 	}
 	batch.mu.Unlock()
 
 	if app := application.Get(); app != nil {
 		app.Event.Emit("batch:progress", p)
+	}
+}
+
+func (d *DownloadService) emitBatchCompleted(batchID string, batch *batchState) {
+	batch.mu.Lock()
+	p := BatchProgress{
+		BatchID:   batchID,
+		Total:     batch.total,
+		Completed: batch.completed,
+		Current:   batch.current,
+		Failed:    batch.failed,
+		Done:      true,
+	}
+	batch.mu.Unlock()
+
+	if app := application.Get(); app != nil {
+		app.Event.Emit("batch:completed", p)
 	}
 }
 

@@ -4,6 +4,7 @@ package engine
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/lrstanley/go-ytdlp"
@@ -37,12 +38,24 @@ func NewCommand() *ytdlp.Command {
 	return c
 }
 
-func BuildCommand(o model.DownloadOptions) *ytdlp.Command {
+// BuildCommand builds a yt-dlp command with the given options and entry.
+// It replaces %(playlist_index)s with the entry's Index value to avoid "000" fallback.
+func BuildCommand(o model.DownloadOptions, entry model.MediaEntry) *ytdlp.Command {
+	// Replace %(playlist_index)s with actual index value
+	template := o.NameTemplate
+	if entry.Index > 0 {
+		template = strings.ReplaceAll(template, "%(playlist_index)s", fmt.Sprintf("%d", entry.Index))
+		template = strings.ReplaceAll(template, "%(playlist_index)03d", fmt.Sprintf("%03d", entry.Index))
+	} else {
+		// Fallback: remove playlist_index if index is 0
+		template = strings.ReplaceAll(template, "%(playlist_index)s - ", "")
+		template = strings.ReplaceAll(template, "%(playlist_index)03d - ", "")
+	}
+
 	c := NewCommand().
 		NoPlaylist().
 		Paths("home:" + o.OutputDir).
-		Output(o.NameTemplate).
-		OutputNaPlaceholder("000")
+		Output(template)
 
 	if o.Mode == "audio" {
 		c = c.ExtractAudio().AudioFormat(o.AudioFormat).AudioQuality(o.AudioQuality)

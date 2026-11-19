@@ -12,6 +12,7 @@ import type * as services$0 from "../../../../../ytdlp-studio/services/models.js
 declare module "@wailsio/runtime" {
     namespace Events {
         interface CustomEvents {
+            "batch:completed": services$0.BatchProgress;
             "batch:progress": services$0.BatchProgress;
             "deps:status": services$0.DepStatus;
             "task:progress": services$0.TaskProgress;

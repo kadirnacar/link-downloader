@@ -24,7 +24,9 @@ export function QueuePanel() {
   const totalItems = activeBatches.reduce((acc, b) => acc + b.total, 0);
   const completedItems = activeBatches.reduce((acc, b) => acc + b.completed, 0);
   const failedItems = activeBatches.reduce((acc, b) => acc + b.failed, 0);
-  const batchPercent = totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
+  const currentItems = activeBatches.reduce((acc, b) => acc + b.current, 0);
+  const allDone = activeBatches.length > 0 && activeBatches.every((b) => b.done);
+  const batchPercent = totalItems > 0 ? (currentItems / totalItems) * 100 : 0;
 
   if (order.length === 0) {
     return <section className="preview empty">Kuyruk boş. Analiz sekmesinden indirme başlat.</section>;
@@ -80,6 +82,11 @@ export function QueuePanel() {
               <div className="meter">
                 <span style={{ width: Math.min(100, batchPercent) + "%" }} />
               </div>
+              {allDone && (
+                <div className="hint" style={{ marginTop: "6px", color: "#8ce4b4" }}>
+                  ✓ İndirme tamamlandı
+                </div>
+              )}
             </div>
           </div>
         </>

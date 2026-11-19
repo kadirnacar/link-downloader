@@ -9,6 +9,11 @@ import type {} from "../github.com/wailsapp/wails/v3/internal/eventdata.js";
 import "../github.com/wailsapp/wails/v3/internal/eventcreate.js";
 
 /**
+ * Name of the custom event "batch:completed".
+ */
+export const BatchCompleted = "batch:completed";
+
+/**
  * Name of the custom event "batch:progress".
  */
 export const BatchProgress = "batch:progress";

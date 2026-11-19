@@ -7,6 +7,7 @@ export interface BatchProgress {
     "completed": number;
     "current": number;
     "failed": number;
+    "done": boolean;
 }
 
 export interface DepStatus {
