@@ -1,5 +1,5 @@
 // ytdlp-studio:generated v1
-// ytdlp-studio:output-template v1
+// ytdlp-studio:output-template v2
 package engine
 
 import (
@@ -38,24 +38,32 @@ func NewCommand() *ytdlp.Command {
 	return c
 }
 
-// BuildCommand builds a yt-dlp command with the given options and entry.
-// It replaces %(playlist_index)s with the entry's Index value to avoid "000" fallback.
-func BuildCommand(o model.DownloadOptions, entry model.MediaEntry) *ytdlp.Command {
-	// Replace %(playlist_index)s with actual index value
-	template := o.NameTemplate
+// ResolveNameTemplate, playlist_index ve playlist türevi alanları uygulama tarafında
+// gerçek değerlerle doldurur. Böylece yt-dlp'nin "NA"/"000" fallback'i devreye girmez.
+func ResolveNameTemplate(tmpl string, entry model.MediaEntry) string {
+	out := tmpl
 	if entry.Index > 0 {
-		template = strings.ReplaceAll(template, "%(playlist_index)s", fmt.Sprintf("%d", entry.Index))
-		template = strings.ReplaceAll(template, "%(playlist_index)03d", fmt.Sprintf("%03d", entry.Index))
+		out = strings.ReplaceAll(out, "%(playlist_index)03d", fmt.Sprintf("%03d", entry.Index))
+		out = strings.ReplaceAll(out, "%(playlist_index)s", fmt.Sprintf("%d", entry.Index))
+		out = strings.ReplaceAll(out, "%(playlist_index)d", fmt.Sprintf("%d", entry.Index))
 	} else {
-		// Fallback: remove playlist_index if index is 0
-		template = strings.ReplaceAll(template, "%(playlist_index)s - ", "")
-		template = strings.ReplaceAll(template, "%(playlist_index)03d - ", "")
+		// Tekil indirmelerde playlist_index yoksa parçayı temizle
+		out = strings.ReplaceAll(out, "%(playlist_index)03d - ", "")
+		out = strings.ReplaceAll(out, "%(playlist_index)s - ", "")
+		out = strings.ReplaceAll(out, "%(playlist_index)d - ", "")
+		out = strings.ReplaceAll(out, "%(playlist_index)03d", "")
+		out = strings.ReplaceAll(out, "%(playlist_index)s", "")
+		out = strings.ReplaceAll(out, "%(playlist_index)d", "")
 	}
+	return out
+}
 
+// BuildCommand, her giriş için ayrı adlandırılmış komut üretir.
+func BuildCommand(o model.DownloadOptions, entry model.MediaEntry) *ytdlp.Command {
 	c := NewCommand().
 		NoPlaylist().
 		Paths("home:" + o.OutputDir).
-		Output(template)
+		Output(ResolveNameTemplate(o.NameTemplate, entry))
 
 	if o.Mode == "audio" {
 		c = c.ExtractAudio().AudioFormat(o.AudioFormat).AudioQuality(o.AudioQuality)

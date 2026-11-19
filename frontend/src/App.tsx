@@ -1,5 +1,5 @@
 // ytdlp-studio:generated v1
-// ytdlp-studio:app v1
+// ytdlp-studio:app v2
 import { useEffect } from "react";
 import { Events } from "@wailsio/runtime";
 import { DepsService, SettingsService } from "./api";
@@ -25,10 +25,12 @@ export default function App() {
   useEffect(() => {
     const offProgress = Events.On("task:progress", (ev) => upsert(ev.data as TaskProgress));
     const offBatch = Events.On("batch:progress", (ev) => upsertBatch(ev.data as BatchProgress));
+    const offBatchDone = Events.On("batch:completed", (ev) => upsertBatch(ev.data as BatchProgress));
     const offDeps = Events.On("deps:status", (ev) => set({ deps: ev.data as DepStatus }));
     return () => {
       offProgress();
       offBatch();
+      offBatchDone();
       offDeps();
     };
   }, [upsert, upsertBatch, set]);
@@ -65,89 +67,57 @@ export default function App() {
   }
 
   const missing = deps?.missing ?? [];
-  const pageTitle = tab === "analyze" ? "İçerik analizi" : "İndirme kuyruğu";
 
   return (
     <div className="app">
-      <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-mark">⬇</div>
-          <div>
-            <strong>ytdlp-studio</strong>
-            <span>v3 · blend UI</span>
-          </div>
+      <header className="topbar">
+        <div className="brand">ytdlp-studio</div>
+        <nav className="tabs">
+          <button className={tab === "analyze" ? "tab active" : "tab"} onClick={() => set({ tab: "analyze" })}>
+            Analiz
+          </button>
+          <button className={tab === "queue" ? "tab active" : "tab"} onClick={() => set({ tab: "queue" })}>
+            Kuyruk
+          </button>
+        </nav>
+        <div className="topbar-actions">
+          <button className="ghost" onClick={() => void updateYtDlp()}>
+            yt-dlp Güncelle
+          </button>
         </div>
-        <div style={{ width: "100%" }}>
-          <div className="nav-label">Sekmeler</div>
-          <nav className="nav">
-            <button
-              className={tab === "analyze" ? "active" : ""}
-              onClick={() => set({ tab: "analyze" })}
-            >
-              <span className="ico">◈</span>
-              Analiz
-            </button>
-            <button
-              className={tab === "queue" ? "active" : ""}
-              onClick={() => set({ tab: "queue" })}
-            >
-              <span className="ico">▤</span>
-              Kuyruk
-            </button>
-          </nav>
+      </header>
+
+      {missing.length > 0 && (
+        <div className="banner">
+          <span>Eksik bileşenler: {missing.join(", ")}</span>
+          <button onClick={() => void installDeps()} disabled={installing}>
+            {installing ? "Kuruluyor…" : "Otomatik Kur"}
+          </button>
         </div>
-        <div className="sidebar-bottom">
-          <strong>Yerel araçlar</strong>
-          yt-dlp, ffmpeg ve ffprobe otomatik yönetilir. Eksikse üstteki banner'dan kurabilirsiniz.
+      )}
+
+      {notice && (
+        <div className="notice" onClick={() => set({ notice: undefined })}>
+          {notice}
         </div>
-      </aside>
+      )}
 
-      <main className="main">
-        <header className="topbar">
-          <div>
-            <div className="eyebrow">ytdlp-studio</div>
-            <h1>{pageTitle}</h1>
+      {tab === "analyze" ? (
+        <main className="analyze">
+          <PasteBar />
+          <div className="analyze-grid">
+            <PreviewList />
+            <OptionsPanel />
           </div>
-          <div className="conn-box">
-            <button className="btn ghost" onClick={() => void updateYtDlp()}>
-              yt-dlp Güncelle
-            </button>
-          </div>
-        </header>
-
-        {missing.length > 0 && (
-          <div className="banner">
-            <span>Eksik bileşenler: {missing.join(", ")}</span>
-            <button className="btn danger" onClick={() => void installDeps()} disabled={installing}>
-              {installing ? "Kuruluyor…" : "Otomatik Kur"}
-            </button>
-          </div>
-        )}
-
-        {notice && (
-          <div
-            className={"notice" + (notice.toLowerCase().includes("başarısız") || notice.toLowerCase().includes("hata") ? " error" : "")}
-            onClick={() => set({ notice: undefined })}
-          >
-            {notice}
-          </div>
-        )}
-
-        {tab === "analyze" ? (
-          <>
-            <PasteBar />
-            <div className="grid two">
-              <PreviewList />
-              <OptionsPanel />
-            </div>
-            <footer className="actionbar">
-              <DownloadButton />
-            </footer>
-          </>
-        ) : (
+          <footer className="actionbar">
+            <DownloadButton />
+          </footer>
+        </main>
+      ) : (
+        <main className="queue">
           <QueuePanel />
-        )}
-      </main>
+        </main>
+      )}
       <Toasts />
     </div>
   );

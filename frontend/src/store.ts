@@ -1,7 +1,7 @@
 // ytdlp-studio:generated v1
-// ytdlp-studio:store v1
+// ytdlp-studio:store v2
 import { create } from "zustand";
-import type { DepStatus, DownloadOptions, MediaInfo, ParsedURL, BatchProgress } from "./types";
+import type { BatchProgress, DepStatus, DownloadOptions, MediaInfo, ParsedURL } from "./types";
 
 export const DEFAULT_OPTIONS: DownloadOptions = {
   mode: "audio",
@@ -47,7 +47,5 @@ export const useStore = create<AppState>((set) => ({
   batches: {},
   set: (p) => set(p),
   upsertBatch: (b) =>
-    set((s) => ({
-      batches: { ...s.batches, [b.batchId]: b },
-    })),
+    set((s) => ({ batches: { ...s.batches, [b.batchId]: b } })),
 }));

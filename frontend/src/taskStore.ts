@@ -1,5 +1,5 @@
 // ytdlp-studio:generated v1
-// ytdlp-studio:taskstore v1
+// ytdlp-studio:taskstore v2
 import { create } from "zustand";
 import type { MediaEntry, TaskProgress } from "./types";
 
@@ -10,15 +10,17 @@ export interface TaskItem extends TaskProgress {
 interface TaskState {
   tasks: Record<string, TaskItem>;
   order: string[];
-  addMany: (ids: string[], entries: MediaEntry[], batchId?: string) => void;
+  addMany: (ids: string[], entries: MediaEntry[]) => void;
   upsert: (p: TaskProgress) => void;
+  removeOne: (id: string) => void;
   clearFinished: () => void;
+  clearAll: () => void;
 }
 
 export const useTasks = create<TaskState>((set) => ({
   tasks: {},
   order: [],
-  addMany: (ids, entries, batchId) =>
+  addMany: (ids, entries) =>
     set((s) => {
       const tasks = { ...s.tasks };
       const order = [...s.order];
@@ -31,7 +33,6 @@ export const useTasks = create<TaskState>((set) => ({
           percent: 0,
           speedBps: 0,
           etaSec: 0,
-          batchId,
         };
         order.push(id);
       });
@@ -42,21 +43,21 @@ export const useTasks = create<TaskState>((set) => ({
       const prev = s.tasks[p.taskId];
       const base: TaskItem =
         prev ??
-        {
-          taskId: p.taskId,
-          title: "",
-          state: "queued",
-          percent: 0,
-          speedBps: 0,
-          etaSec: 0,
-        };
+        { taskId: p.taskId, title: "", state: "queued", percent: 0, speedBps: 0, etaSec: 0 };
       const item: TaskItem = {
         ...base,
         ...p,
+        batchId: p.batchId || base.batchId,
         error: p.state === "error" ? p.error : undefined,
       };
       const order = prev ? s.order : [...s.order, p.taskId];
       return { tasks: { ...s.tasks, [p.taskId]: item }, order };
+    }),
+  removeOne: (id) =>
+    set((s) => {
+      const tasks = { ...s.tasks };
+      delete tasks[id];
+      return { tasks, order: s.order.filter((x) => x !== id) };
     }),
   clearFinished: () =>
     set((s) => {
@@ -71,4 +72,5 @@ export const useTasks = create<TaskState>((set) => ({
       });
       return { tasks, order };
     }),
+  clearAll: () => set({ tasks: {}, order: [] }),
 }));

@@ -1,5 +1,5 @@
 // ytdlp-studio:generated v1
-// ytdlp-studio:events v1
+// ytdlp-studio:events v2
 package services
 
 import "github.com/wailsapp/wails/v3/pkg/application"

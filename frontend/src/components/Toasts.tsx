@@ -1,8 +1,8 @@
 // ytdlp-studio:generated v1
-// ytdlp-studio:toasts v1
+// ytdlp-studio:toasts v2
 import { useEffect, useState } from "react";
 import { Events } from "@wailsio/runtime";
-import type { TaskProgress, BatchProgress } from "../types";
+import type { BatchProgress } from "../types";
 
 interface ToastItem {
   id: number;
@@ -16,27 +16,17 @@ export function Toasts() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   useEffect(() => {
-    const offProgress = Events.On("task:progress", (ev) => {
-      const p = ev.data as TaskProgress;
-      if (p.state === "done") {
-        pushToast(`"${(p as unknown as { title?: string }).title ?? "Dosya"}" indirildi.`, "good");
-      } else if (p.state === "error") {
-        pushToast("İndirme hatası: " + (p.error ?? "bilinmiyor"), "bad");
+    const off = Events.On("batch:completed", (ev) => {
+      const b = ev.data as BatchProgress;
+      if (!b) return;
+      if (b.failed > 0) {
+        pushToast(`İndirme bitti: ${b.completed} başarılı, ${b.failed} hatalı.`, "bad");
+      } else {
+        pushToast(`İndirme tamamlandı: ${b.completed}/${b.total} dosya hazır.`, "good");
       }
     });
-
-    const offCompleted = Events.On("batch:completed", (ev) => {
-      const b = ev.data as BatchProgress;
-      const successRate = b.total > 0 ? ((b.completed / b.total) * 100).toFixed(0) : "0";
-      pushToast(
-        `Playlist tamamlandı: ${b.completed}/${b.total} başarılı (${successRate}%)`,
-        b.failed === 0 ? "good" : "bad"
-      );
-    });
-
     return () => {
-      offProgress();
-      offCompleted();
+      off();
     };
   }, []);
 
@@ -45,8 +35,10 @@ export function Toasts() {
     setToasts((prev) => [...prev, { id, message, kind }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4000);
+    }, 5000);
   }
+
+  if (toasts.length === 0) return null;
 
   return (
     <div className="toast-wrap">

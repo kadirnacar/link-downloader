@@ -1,5 +1,5 @@
 // ytdlp-studio:generated v1
-// ytdlp-studio:types v1
+// ytdlp-studio:types v2
 
 export interface ParsedURL {
   kind: string;
@@ -57,8 +57,8 @@ export interface BatchProgress {
   batchId: string;
   total: number;
   completed: number;
-  current: number;
   failed: number;
+  current: number;
   done: boolean;
 }
 
