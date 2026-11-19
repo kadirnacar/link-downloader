@@ -13,6 +13,7 @@ export {
 };
 
 export type {
+    BatchProgress,
     DepStatus,
     TaskProgress
 } from "./models.js";

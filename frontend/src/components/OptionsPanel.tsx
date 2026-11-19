@@ -1,4 +1,5 @@
 // ytdlp-studio:generated v1
+// ytdlp-studio:options v1
 import { DownloadService } from "../api";
 import { useStore } from "../store";
 import type { DownloadOptions } from "../types";
@@ -25,7 +26,11 @@ export function OptionsPanel() {
 
   return (
     <aside className="options">
-      <h3>İndirme Kuralları</h3>
+      <div className="card-head">
+        <h3>İndirme Kuralları</h3>
+        <span className="tag">Ayarlar</span>
+      </div>
+
       <div className="seg">
         <button className={options.mode === "audio" ? "active" : ""} onClick={() => upd({ mode: "audio" })}>
           🎵 Ses
@@ -89,7 +94,9 @@ export function OptionsPanel() {
         Klasör
         <div className="folder-row">
           <input readOnly value={options.outputDir} placeholder="Seçilmedi" />
-          <button onClick={() => void pickFolder()}>Seç…</button>
+          <button className="btn" onClick={() => void pickFolder()}>
+            Seç…
+          </button>
         </div>
       </label>
 
@@ -105,11 +112,19 @@ export function OptionsPanel() {
       </label>
 
       <label className="check">
-        <input type="checkbox" checked={options.embedThumbnail} onChange={(e) => upd({ embedThumbnail: e.target.checked })} />
+        <input
+          type="checkbox"
+          checked={options.embedThumbnail}
+          onChange={(e) => upd({ embedThumbnail: e.target.checked })}
+        />
         Kapak göm
       </label>
       <label className="check">
-        <input type="checkbox" checked={options.embedMetadata} onChange={(e) => upd({ embedMetadata: e.target.checked })} />
+        <input
+          type="checkbox"
+          checked={options.embedMetadata}
+          onChange={(e) => upd({ embedMetadata: e.target.checked })}
+        />
         Metadata göm
       </label>
 
@@ -117,11 +132,18 @@ export function OptionsPanel() {
         <summary>Gelişmiş</summary>
         <label>
           Hız limiti
-          <input placeholder="ör. 5M (boş = limitsiz)" value={options.rateLimit} onChange={(e) => upd({ rateLimit: e.target.value })} />
+          <input
+            placeholder="ör. 5M (boş = limitsiz)"
+            value={options.rateLimit}
+            onChange={(e) => upd({ rateLimit: e.target.value })}
+          />
         </label>
         <label>
           Eşzamanlı parça
-          <select value={options.concurrentFragments} onChange={(e) => upd({ concurrentFragments: Number(e.target.value) })}>
+          <select
+            value={options.concurrentFragments}
+            onChange={(e) => upd({ concurrentFragments: Number(e.target.value) })}
+          >
             {[1, 2, 4, 8].map((n) => (
               <option key={n} value={n}>
                 {n}
@@ -131,7 +153,10 @@ export function OptionsPanel() {
         </label>
         <label>
           Çerezler
-          <select value={options.cookiesBrowser} onChange={(e) => upd({ cookiesBrowser: e.target.value })}>
+          <select
+            value={options.cookiesBrowser}
+            onChange={(e) => upd({ cookiesBrowser: e.target.value })}
+          >
             <option value="">Kullanma</option>
             {["chrome", "safari", "firefox", "brave", "edge"].map((b) => (
               <option key={b} value={b}>

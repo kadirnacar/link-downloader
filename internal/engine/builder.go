@@ -1,4 +1,5 @@
 // ytdlp-studio:generated v1
+// ytdlp-studio:output-template v1
 package engine
 
 import (
@@ -6,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/lrstanley/go-ytdlp"
-
 	"ytdlp-studio/internal/model"
 )
 
@@ -26,6 +26,7 @@ func NewCommand() *ytdlp.Command {
 	mu.RLock()
 	yt, ff := ytDlpPath, ffmpegDir
 	mu.RUnlock()
+
 	c := ytdlp.New().IgnoreConfig()
 	if yt != "" {
 		c = c.SetExecutable(yt)
@@ -40,7 +41,9 @@ func BuildCommand(o model.DownloadOptions) *ytdlp.Command {
 	c := NewCommand().
 		NoPlaylist().
 		Paths("home:" + o.OutputDir).
-		Output(o.NameTemplate)
+		Output(o.NameTemplate).
+		OutputNaPlaceholder("000")
+
 	if o.Mode == "audio" {
 		c = c.ExtractAudio().AudioFormat(o.AudioFormat).AudioQuality(o.AudioQuality)
 	} else {

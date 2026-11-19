@@ -9,9 +9,6 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 // @ts-ignore: Unused imports
 import * as model$0 from "../internal/model/models.js";
 
-/**
- * ytdlp-studio:playlist-all-analyze v2
- */
 export function Analyze(raw: string, scope: string): $CancellablePromise<model$0.MediaInfo | null> {
     return $Call.ByID(2519199345, raw, scope);
 }

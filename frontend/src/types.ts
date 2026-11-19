@@ -1,4 +1,6 @@
 // ytdlp-studio:generated v1
+// ytdlp-studio:types v1
+
 export interface ParsedURL {
   kind: string;
   videoId: string;
@@ -48,6 +50,15 @@ export interface TaskProgress {
   etaSec: number;
   error?: string;
   filePath?: string;
+  batchId?: string;
+}
+
+export interface BatchProgress {
+  batchId: string;
+  total: number;
+  completed: number;
+  current: number;
+  failed: number;
 }
 
 export interface DepStatus {
