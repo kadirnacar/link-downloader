@@ -1,5 +1,5 @@
 // ytdlp-studio:generated v1
-// ytdlp-studio:deps v3
+// ytdlp-studio:deps v4
 package services
 
 import (
@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/lrstanley/go-ytdlp"
@@ -37,23 +38,39 @@ func exeName(n string) string {
 	return n
 }
 
+// look gerçek binary'yi bulur; pyenv/volta benzeri shim dizinlerini en sona atar.
 func look(name string) string {
 	bin := exeName(name)
-	if p, err := exec.LookPath(bin); err == nil {
-		return p
-	}
-	dirs := []string{"/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"}
-	if cache, err := ytdlp.GetCacheDir(); err == nil {
-		dirs = append(dirs, cache)
+	var preferred, fallback []string
+
+	dirs := []string{"/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"}
+	if runtime.GOOS == "windows" {
+		dirs = []string{`C:\ffmpeg\bin`, `C:\Program Files\ffmpeg\bin`}
 	}
 	if home, err := os.UserHomeDir(); err == nil {
 		dirs = append(dirs, filepath.Join(home, ".local", "bin"))
 	}
+	if cache, err := ytdlp.GetCacheDir(); err == nil {
+		dirs = append(dirs, cache)
+	}
 	for _, dir := range dirs {
 		p := filepath.Join(dir, bin)
 		if st, err := os.Stat(p); err == nil && !st.IsDir() {
-			return p
+			preferred = append(preferred, p)
 		}
+	}
+	if p, err := exec.LookPath(bin); err == nil {
+		if strings.Contains(p, string(filepath.Separator)+"shims"+string(filepath.Separator)) {
+			fallback = append(fallback, p)
+		} else {
+			preferred = append(preferred, p)
+		}
+	}
+	if len(preferred) > 0 {
+		return preferred[0]
+	}
+	if len(fallback) > 0 {
+		return fallback[0]
 	}
 	return ""
 }
@@ -82,11 +99,8 @@ func (s *DepsService) CheckDeps() DepStatus {
 	if js == "" {
 		st.Missing = append(st.Missing, "deno/bun")
 	}
-	ffDir := ""
-	if ff != "" {
-		ffDir = filepath.Dir(ff)
-	}
-	engine.SetPaths(yt, ffDir)
+	// yt-dlp --ffmpeg-location binary yolunu da kabul eder; bu daha güvenilirdir.
+	engine.SetPaths(yt, ff)
 	if yt != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		if v, err := engine.Version(ctx); err == nil {
@@ -137,7 +151,6 @@ func (s *DepsService) InstallDeps() (DepStatus, error) {
 	return s.CheckDeps(), nil
 }
 
-// UpdateYtDlp seçili kanala göre günceller: stable | nightly | master.
 func (s *DepsService) UpdateYtDlp(channel string) (string, error) {
 	yt := look("yt-dlp")
 	if yt == "" {

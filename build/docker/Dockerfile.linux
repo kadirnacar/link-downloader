@@ -1,33 +1,16 @@
-# ytdlp-studio:dockerfile-linux v3
-# Wails v3.0.0 Linux builder: GTK4 + WebKitGTK 6.0 + libsoup-3.0
-# Apple Silicon'da `docker build --platform linux/amd64` ile kullanilir (Rosetta).
-# Frontend host'ta derlenir; bu imaj sadece `go build` calistirir.
+# ytdlp-studio:dockerfile-linux v4
 FROM ubuntu:24.04
-
 ENV DEBIAN_FRONTEND=noninteractive
 ENV CGO_ENABLED=1
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    pkg-config \
-    curl \
-    ca-certificates \
-    git \
-    libgtk-4-dev \
-    libwebkitgtk-6.0-dev \
-    libsoup-3.0-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Wails v3 Linux CGO gereksinimlerini imaj build aninda dogrula
-RUN pkg-config --exists gtk4 webkitgtk-6.0 libsoup-3.0 gio-unix-2.0 glib-2.0 gobject-2.0 \
-    && pkg-config --modversion gtk4 webkitgtk-6.0 libsoup-3.0
-
-# Go 1.27 (go.mod gereksinimi)
+ARG GOARCH=amd64
 ARG GO_VERSION=1.27.3
-RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -C /usr/local -xz
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential pkg-config curl ca-certificates git \
+    libgtk-4-dev libwebkitgtk-6.0-dev libsoup-3.0-dev \
+    && rm -rf /var/lib/apt/lists/*
+RUN pkg-config --exists gtk4 webkitgtk-6.0 libsoup-3.0
+RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-${GOARCH}.tar.gz" | tar -C /usr/local -xz
 ENV PATH="/usr/local/go/bin:${PATH}"
 ENV GOMODCACHE=/go/pkg/mod
 ENV GOCACHE=/root/.cache/go-build
-
-LABEL ytdlp.builder="v3"
 WORKDIR /app

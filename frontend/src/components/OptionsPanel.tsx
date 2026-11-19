@@ -1,10 +1,28 @@
 // ytdlp-studio:generated v1
+// ytdlp-studio:options v4
+import { DownloadService } from "../api";
 import { useStore } from "../store";
+
+const NAME_PRESETS = [
+  "%(playlist_index)03d - %(title)s.%(ext)s",
+  "%(playlist_title)s/%(playlist_index)03d - %(title)s.%(ext)s",
+  "%(title)s.%(ext)s",
+  "%(uploader)s/%(title)s.%(ext)s",
+];
 
 export function OptionsPanel() {
   const o = useStore((s) => s.options);
   const patch = useStore((s) => s.patchOptions);
   const set = useStore((s) => s.set);
+
+  async function pickFolder() {
+    try {
+      const dir = await DownloadService.PickFolder();
+      if (dir) patch({ outputDir: dir });
+    } catch { /* iptal */ }
+  }
+
+  const presets = NAME_PRESETS.includes(o.nameTemplate) ? NAME_PRESETS : [o.nameTemplate, ...NAME_PRESETS];
 
   return (
     <aside className="card options">
@@ -22,7 +40,7 @@ export function OptionsPanel() {
       {o.mode === "audio" && (
         <div className="field">
           <label>Format / kalite</label>
-          <div className="inline">
+          <div className="grid-2">
             <select value={o.audioFormat} onChange={(e) => patch({ audioFormat: e.target.value })}>
               {["mp3", "m4a", "opus", "flac", "wav"].map((f) => <option key={f} value={f}>{f.toUpperCase()}</option>)}
             </select>
@@ -37,7 +55,7 @@ export function OptionsPanel() {
       {o.mode === "video" && (
         <div className="field">
           <label>Çözünürlük / kap</label>
-          <div className="inline">
+          <div className="grid-2">
             <select value={o.videoHeight} onChange={(e) => patch({ videoHeight: Number(e.target.value) })}>
               <option value={0}>En iyi</option>
               {[2160, 1440, 1080, 720, 480].map((h) => <option key={h} value={h}>{h}p</option>)}
@@ -81,8 +99,18 @@ export function OptionsPanel() {
       )}
 
       <div className="field">
-        <label>Klasör</label>
-        <input readOnly value={o.outputDir} placeholder="Ayarlar > Dosya bölümünden seçin" />
+        <label>İndirme klasörü</label>
+        <div className="path-row">
+          <input value={o.outputDir} placeholder="Klasör seçilmedi" onChange={(e) => patch({ outputDir: e.target.value })} />
+          <button className="btn" onClick={() => void pickFolder()}>Seç…</button>
+        </div>
+      </div>
+
+      <div className="field">
+        <label>Dosya adı şablonu</label>
+        <select value={o.nameTemplate} onChange={(e) => patch({ nameTemplate: e.target.value })}>
+          {presets.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
       </div>
     </aside>
   );

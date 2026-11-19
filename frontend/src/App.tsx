@@ -59,6 +59,12 @@ export default function App() {
     document.documentElement.dataset.accent = app.accent;
   }, [app.theme, app.accent]);
 
+  useEffect(() => {
+    const ua = navigator.userAgent.toLowerCase();
+    const os = ua.includes("windows") ? "windows" : ua.includes("linux") ? "linux" : "mac";
+    document.documentElement.dataset.os = os;
+  }, []);
+
   const missing = deps?.missing ?? [];
 
   return (

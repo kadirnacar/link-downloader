@@ -17,9 +17,6 @@ export function InstallDeps(): $CancellablePromise<$models.DepStatus> {
     return $Call.ByID(900204982);
 }
 
-/**
- * UpdateYtDlp seçili kanala göre günceller: stable | nightly | master.
- */
 export function UpdateYtDlp(channel: string): $CancellablePromise<string> {
     return $Call.ByID(1706510323, channel);
 }

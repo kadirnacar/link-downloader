@@ -1,17 +1,12 @@
-# ytdlp-studio:release v1
+# ytdlp-studio:release v2
 name: release
-
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
     inputs:
-      tag:
-        description: "Yayınlanacak etiket (örn. v1.0.0)"
-        required: true
-
-permissions:
-  contents: write
+      tag: { description: "Etiket (v1.0.0)", required: true }
+permissions: { contents: write }
 
 jobs:
   build:
@@ -21,94 +16,97 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-14
-            goos: darwin
-            goarch: arm64
-            ext: ""
-          - runner: macos-14
-            goos: darwin
-            goarch: amd64
-            ext: ""
-          - runner: ubuntu-24.04
-            goos: linux
-            goarch: amd64
-            ext: ""
-          - runner: ubuntu-24.04-arm
-            goos: linux
-            goarch: arm64
-            ext: ""
-          - runner: windows-latest
-            goos: windows
-            goarch: amd64
-            ext: ".exe"
-          - runner: windows-latest
-            goos: windows
-            goarch: arm64
-            ext: ".exe"
-
+          - { runner: macos-14,        goos: darwin,  goarch: arm64, ext: "" }
+          - { runner: macos-14,        goos: darwin,  goarch: amd64, ext: "" }
+          - { runner: ubuntu-24.04,    goos: linux,   goarch: amd64, ext: "" }
+          - { runner: ubuntu-24.04-arm,goos: linux,   goarch: arm64, ext: "" }
+          - { runner: windows-latest,  goos: windows, goarch: amd64, ext: ".exe" }
+          - { runner: windows-latest,  goos: windows, goarch: arm64, ext: ".exe" }
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-go@v5
-        with:
-          go-version: "1.27.x"
-          cache: true
-
+        with: { go-version: "1.27.x", cache: true }
       - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
+        with: { node-version: "22" }
+      - run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
 
-      - name: Install Wails v3 CLI
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
-
-      - name: Linux GUI dependencies (GTK4 + WebKitGTK 6.0)
+      - name: Linux GUI deps
         if: matrix.goos == 'linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev libsoup-3.0-dev pkg-config build-essential
 
-      - name: Frontend build
+      - name: Frontend
         working-directory: frontend
         run: |
           npm install --no-audit --no-fund
           npm run build
 
-      - name: Generate bindings
-        run: wails3 generate bindings -clean=true -ts -i
+      - run: wails3 generate bindings -clean=true -ts -i
 
-      - name: Windows resource (syso)
+      - name: Windows syso
         if: matrix.goos == 'windows'
         shell: bash
         run: |
-          wails3 generate syso -arch ${{ matrix.goarch }} \
-            -icon build/windows/icon.ico \
-            -manifest build/windows/wails.exe.manifest \
-            -info build/windows/info.json \
+          wails3 generate syso -arch ${{ matrix.goarch }} -icon build/windows/icon.ico \
+            -manifest build/windows/wails.exe.manifest -info build/windows/info.json \
             -out wails_windows_${{ matrix.goarch }}.syso || true
 
-      - name: Go build
+      - name: Build
         shell: bash
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: ${{ matrix.goos == 'windows' && '0' || '1' }}
         run: |
-          mkdir -p dist
+          mkdir -p release
+          NAME="ytdlp-studio_${{ matrix.goos }}_${{ matrix.goarch }}${{ matrix.ext }}"
           LDFLAGS="-w -s"
           if [ "${{ matrix.goos }}" = "windows" ]; then LDFLAGS="$LDFLAGS -H windowsgui"; fi
-          go build -tags production -trimpath -buildvcs=false \
-            -ldflags="$LDFLAGS" \
-            -o "dist/ytdlp-studio_${{ matrix.goos }}_${{ matrix.goarch }}${{ matrix.ext }}"
+          go build -tags production -trimpath -buildvcs=false -ldflags="$LDFLAGS" -o "release/$NAME"
           rm -f *.syso
 
-      - name: Ad-hoc codesign (macOS)
+      - name: Package macOS (.app + .dmg)
         if: matrix.goos == 'darwin'
-        run: codesign --force --sign - "dist/ytdlp-studio_darwin_${{ matrix.goarch }}" || true
+        run: |
+          codesign --force --sign - "release/ytdlp-studio_darwin_${{ matrix.goarch }}" || true
+          A="release/ytdlp-studio_${{ matrix.goarch }}.app"
+          mkdir -p "$A/Contents/MacOS" "$A/Contents/Resources"
+          cp "release/ytdlp-studio_darwin_${{ matrix.goarch }}" "$A/Contents/MacOS/ytdlp-studio"
+          cp build/darwin/Info.plist "$A/Contents/Info.plist"
+          cp build/darwin/icons.icns "$A/Contents/Resources/icons.icns"
+          (cd release && zip -qry "ytdlp-studio_darwin_${{ matrix.goarch }}.app.zip" "ytdlp-studio_${{ matrix.goarch }}.app")
+          hdiutil create -volname ytdlp-studio -srcfolder "$A" -ov -format UDZO \
+            "release/ytdlp-studio_darwin_${{ matrix.goarch }}.dmg"
+          rm -rf "$A"
+
+      - name: Package Windows (.zip)
+        if: matrix.goos == 'windows'
+        shell: bash
+        run: |
+          cd release
+          7z a -tzip "ytdlp-studio_windows_${{ matrix.goarch }}.zip" "ytdlp-studio_windows_${{ matrix.goarch }}.exe"
+
+      - name: Package Linux (.tar.gz + .deb)
+        if: matrix.goos == 'linux'
+        run: |
+          chmod +x "release/ytdlp-studio_linux_${{ matrix.goarch }}"
+          tar -czf "release/ytdlp-studio_linux_${{ matrix.goarch }}.tar.gz" -C release "ytdlp-studio_linux_${{ matrix.goarch }}"
+          D="release/deb"; mkdir -p "$D/DEBIAN" "$D/usr/bin" "$D/usr/share/applications"
+          cp "release/ytdlp-studio_linux_${{ matrix.goarch }}" "$D/usr/bin/ytdlp-studio"
+          for s in 16 32 48 64 128 256 512; do
+            f="build/linux/icons/hicolor/${s}x${s}/apps/ytdlp-studio.png"
+            [ -f "$f" ] && install -Dm644 "$f" "$D/usr/share/icons/hicolor/${s}x${s}/apps/ytdlp-studio.png"
+          done
+          printf 'Package: ytdlp-studio\nVersion: 1.0.0\nArchitecture: ${{ matrix.goarch }}\nMaintainer: ytdlp-studio\nDepends: libgtk-4-1, libwebkitgtk-6.0-4, libsoup-3.0-0\nDescription: yt-dlp desktop download studio\n' > "$D/DEBIAN/control"
+          printf '[Desktop Entry]\nType=Application\nName=ytdlp-studio\nExec=ytdlp-studio\nIcon=ytdlp-studio\nCategories=AudioVideo;Network;\nTerminal=false\n' > "$D/usr/share/applications/ytdlp-studio.desktop"
+          dpkg-deb --build "$D" "release/ytdlp-studio_linux_${{ matrix.goarch }}.deb"
+          rm -rf "$D"
 
       - uses: actions/upload-artifact@v4
         with:
           name: ytdlp-studio_${{ matrix.goos }}_${{ matrix.goarch }}
-          path: dist/*
+          path: release/*
           if-no-files-found: error
 
   release:
@@ -116,19 +114,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-          merge-multiple: true
-
-      - name: Checksums
-        run: |
+        with: { path: artifacts, merge-multiple: true }
+      - run: |
           cd artifacts
-          chmod +x ytdlp-studio_darwin_* ytdlp-studio_linux_* || true
           sha256sum ytdlp-studio_* > checksums.txt
           ls -lh
-
-      - name: Publish release
-        uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           name: ${{ github.event.inputs.tag || github.ref_name }}

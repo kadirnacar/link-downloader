@@ -148,6 +148,7 @@ func BuildArgs(o model.DownloadOptions, e model.MediaEntry, pl PlaylistContext) 
 	if d := FFmpegDir(); d != "" {
 		a = append(a, "--ffmpeg-location", d)
 	}
+	// URL her zaman RunDownload tarafından '--' sonrasına eklenir.
 	a = append(a,
 		"--paths", "home:"+o.OutputDir,
 		"-o", ResolveNameTemplate(o.NameTemplate, e, pl),

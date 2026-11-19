@@ -190,6 +190,7 @@ func (d *DownloadService) Enqueue(entries []model.MediaEntry, opts model.Downloa
 		if e.Index <= 0 {
 			e.Index = i + 1
 		}
+		e.URL = engine.EntryURL(e.ID, e.URL)
 		d.seq++
 		id := fmt.Sprintf("%s-%d", e.ID, d.seq)
 		t := downloadTask{id: id, batchID: bid, title: e.Title, entry: e, opts: opts, pl: pl}
@@ -508,7 +509,7 @@ func (d *DownloadService) run(t downloadTask) {
 	}
 
 	d.emit(TaskProgress{TaskID: t.id, State: "downloading", BatchID: t.batchID, BatchTitle: t.title})
-	err := engine.RunDownload(ctx, engine.BuildArgs(t.opts, t.entry, t.pl), hooks)
+	err := engine.RunDownload(ctx, engine.BuildArgs(t.opts, t.entry, t.pl), engine.EntryURL(t.entry.ID, t.entry.URL), hooks)
 
 	d.mu.Lock()
 	wasCanceled := d.canceled[t.id]

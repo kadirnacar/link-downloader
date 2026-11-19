@@ -1,5 +1,5 @@
 // ytdlp-studio:generated v1
-// ytdlp-studio:main v3
+// ytdlp-studio:main v4
 package main
 
 import (
@@ -34,14 +34,16 @@ func main() {
 		},
 	})
 
-	app.Window.NewWithOptions(application.WebviewWindowOptions{
+	opts := application.WebviewWindowOptions{
 		Title:     "ytdlp-studio",
 		Width:     1280,
 		Height:    840,
 		MinWidth:  960,
 		MinHeight: 620,
 		URL:       "/",
-	})
+	}
+	tuneWindow(&opts)
+	app.Window.NewWithOptions(opts)
 
 	if appCfg.CheckDepsOnStart {
 		go deps.CheckDeps()

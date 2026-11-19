@@ -1,4 +1,5 @@
 // ytdlp-studio:generated v1
+// ytdlp-studio:exec v4
 package engine
 
 import (
@@ -48,13 +49,43 @@ func binary() (string, error) {
 	return b, nil
 }
 
-// RunDownload yt-dlp'yi çalıştırır ve ilerlemeyi ayrıştırır.
-func RunDownload(ctx context.Context, args []string, h Hooks) error {
+// EntryURL indirilecek hedef URL'yi garanti eder.
+func EntryURL(id, url string) string {
+	u := strings.TrimSpace(url)
+	if u != "" {
+		return u
+	}
+	if strings.TrimSpace(id) != "" {
+		return "https://www.youtube.com/watch?v=" + strings.TrimSpace(id)
+	}
+	return ""
+}
+
+// RunDownload argümanların SONUNA '-- <url>' ekleyerek çalıştırır.
+func RunDownload(ctx context.Context, args []string, url string, h Hooks) error {
 	bin, err := binary()
 	if err != nil {
 		return err
 	}
-	cmd := exec.CommandContext(ctx, bin, args...)
+	target := strings.TrimSpace(url)
+	if target == "" {
+		return errors.New("indirme URL'si boş; öğe çözümlenemedi")
+	}
+
+	final := make([]string, 0, len(args)+2)
+	for _, a := range args {
+		if a == "--" {
+			continue
+		}
+		final = append(final, a)
+	}
+	final = append(final, "--", target)
+
+	if h.OnLog != nil {
+		h.OnLog("cmd: yt-dlp " + strings.Join(final, " "))
+	}
+
+	cmd := exec.CommandContext(ctx, bin, final...)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return err
@@ -141,15 +172,22 @@ func RunDownload(ctx context.Context, args []string, h Hooks) error {
 	return nil
 }
 
-// ExtractInfo tek JSON çıktısı döndürür.
 func ExtractInfo(ctx context.Context, target string, extra ...string) ([]byte, error) {
 	bin, err := binary()
 	if err != nil {
 		return nil, err
 	}
+	if strings.TrimSpace(target) == "" {
+		return nil, errors.New("analiz URL'si boş")
+	}
 	args := []string{"--ignore-config", "--no-colors", "--no-warnings", "--dump-single-json"}
-	args = append(args, extra...)
-	args = append(args, target)
+	for _, a := range extra {
+		if a != "--" {
+			args = append(args, a)
+		}
+	}
+	args = append(args, "--", target)
+
 	cmd := exec.CommandContext(ctx, bin, args...)
 	var out, errb bytes.Buffer
 	cmd.Stdout = &out
