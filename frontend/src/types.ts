@@ -1,5 +1,5 @@
 // ytdlp-studio:generated v1
-// ytdlp-studio:types v2
+// ytdlp-studio:types v3
 
 export interface ParsedURL {
   kind: string;

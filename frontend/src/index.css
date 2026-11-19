@@ -838,3 +838,197 @@ input::placeholder { color: #667d98; }
   border-color: rgba(240, 110, 120, 0.5);
 }
 /* ytdlp-studio:pastebar-fix v1:end */
+
+/* ytdlp-studio:fullscreen-layout v1 */
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+.app {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.topbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.analyze, .queue {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  padding: 16px 20px;
+}
+
+.analyze-grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+}
+
+.pastebar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.pastebar-field {
+  flex: 1 1 auto;
+  min-width: 200px;
+  display: flex;
+}
+
+.pastebar-field .url-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+}
+
+.pastebar-side {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.pastebar-btn {
+  min-width: 138px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.pastebar-scope {
+  flex: 0 0 auto;
+  width: 150px;
+}
+
+.pastebar .chip,
+.pastebar .warn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.pastebar-error {
+  flex: 1 1 100%;
+}
+
+.actionbar {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.preview {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.queue-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.queue-panel .rows {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.task-btns {
+  display: inline-flex;
+  gap: 6px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.task-btns button {
+  white-space: nowrap;
+}
+
+.queue-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.queue-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.queue-actions button {
+  white-space: nowrap;
+}
+
+.batch-card {
+  padding: 10px 12px;
+  margin: 8px 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.batch-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.batch-head .muted {
+  opacity: 0.7;
+}
+
+.toast-wrap {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 99;
+  display: grid;
+  gap: 8px;
+  width: min(370px, calc(100vw - 36px));
+}
+
+.toast {
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(20, 24, 32, 0.96);
+  border-radius: 10px;
+  font-size: 13px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.toast.good {
+  border-color: rgba(90, 200, 130, 0.5);
+}
+
+.toast.bad {
+  border-color: rgba(240, 110, 120, 0.5);
+}
+/* ytdlp-studio:fullscreen-layout v1:end */

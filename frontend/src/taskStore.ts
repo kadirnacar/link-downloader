@@ -1,5 +1,5 @@
 // ytdlp-studio:generated v1
-// ytdlp-studio:taskstore v2
+// ytdlp-studio:taskstore v3
 import { create } from "zustand";
 import type { MediaEntry, TaskProgress } from "./types";
 
@@ -10,7 +10,7 @@ export interface TaskItem extends TaskProgress {
 interface TaskState {
   tasks: Record<string, TaskItem>;
   order: string[];
-  addMany: (ids: string[], entries: MediaEntry[]) => void;
+  addMany: (ids: string[], entries: MediaEntry[], batchId?: string) => void;
   upsert: (p: TaskProgress) => void;
   removeOne: (id: string) => void;
   clearFinished: () => void;
@@ -20,7 +20,7 @@ interface TaskState {
 export const useTasks = create<TaskState>((set) => ({
   tasks: {},
   order: [],
-  addMany: (ids, entries) =>
+  addMany: (ids, entries, batchId) =>
     set((s) => {
       const tasks = { ...s.tasks };
       const order = [...s.order];
@@ -33,6 +33,7 @@ export const useTasks = create<TaskState>((set) => ({
           percent: 0,
           speedBps: 0,
           etaSec: 0,
+          batchId: batchId || undefined,
         };
         order.push(id);
       });
