@@ -1,5 +1,4 @@
 // ytdlp-studio:generated v1
-// ytdlp-studio:pastebar v2
 import { AnalyzeService } from "../api";
 import { useStore } from "../store";
 
@@ -9,19 +8,19 @@ export function PasteBar() {
   const scope = useStore((s) => s.scope);
   const analyzing = useStore((s) => s.analyzing);
   const error = useStore((s) => s.error);
+  const options = useStore((s) => s.options);
+  const app = useStore((s) => s.app);
   const set = useStore((s) => s.set);
 
   async function analyze(raw: string, sc: "video" | "playlist") {
     const trimmed = raw.trim();
     if (!trimmed) return;
-    set({ analyzing: true, error: undefined, info: undefined });
+    set({ analyzing: true, error: undefined, info: undefined, subs: undefined });
     try {
       const p = await AnalyzeService.ParseURL(trimmed);
-      const info = await AnalyzeService.Analyze(trimmed, sc);
+      const info = await AnalyzeService.Analyze(trimmed, sc, options.playlistItems);
       set({
-        url: trimmed,
-        parsed: p,
-        info: info ?? undefined,
+        url: trimmed, parsed: p, info: info ?? undefined,
         selected: new Set((info?.entries ?? []).filter((e) => e.available).map((e) => e.id)),
       });
     } catch (e) {
@@ -34,53 +33,40 @@ export function PasteBar() {
   return (
     <section className="pastebar">
       <div className="pastebar-field">
-        <input
-          className="url-input"
-          placeholder="YouTube video veya playlist URL'si yapıştır…"
-          value={url}
+        <input className="url-input" placeholder="YouTube video veya playlist URL'si yapıştır…"
+          value={url} disabled={analyzing}
           onChange={(e) => set({ url: e.target.value })}
           onPaste={(e) => {
-            const text = e.clipboardData.getData("text");
-            if (text.trim().startsWith("http")) {
+            const text = e.clipboardData.getData("text").trim();
+            if (app.clipboardAutoAnalyze && text.startsWith("http")) {
               e.preventDefault();
-              set({ url: text.trim() });
+              set({ url: text });
               void analyze(text, scope);
             }
           }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") void analyze(url, scope);
-          }}
-          disabled={analyzing}
-        />
+          onKeyDown={(e) => { if (e.key === "Enter") void analyze(url, scope); }} />
       </div>
-
       <div className="pastebar-side">
-        <button className="pastebar-btn" onClick={() => void analyze(url, scope)} disabled={analyzing || !url.trim()}>
+        <button className="btn primary pastebar-btn" disabled={analyzing || !url.trim()} onClick={() => void analyze(url, scope)}>
           {analyzing ? "Analiz ediliyor…" : "Analiz Et"}
         </button>
         {parsed?.ambiguous && (
-          <select
-            className="pastebar-scope"
-            value={scope}
+          <select className="pastebar-scope" value={scope}
             onChange={(e) => {
               const sc = e.target.value as "video" | "playlist";
               set({ scope: sc });
               void analyze(url, sc);
-            }}
-          >
+            }}>
             <option value="video">Sadece video</option>
             <option value="playlist">Tüm playlist</option>
           </select>
         )}
+        {parsed && !parsed.ambiguous && (
+          <span className="tag info">{parsed.kind === "playlist" ? "Playlist" : parsed.kind === "video" ? "Video" : "Diğer"}</span>
+        )}
+        {parsed?.isMix && <span className="tag warn">Mix</span>}
       </div>
-
-      {parsed && !parsed.ambiguous && (
-        <span className="chip">
-          {parsed.kind === "playlist" ? "Playlist" : parsed.kind === "video" ? "Video" : "Diğer"}
-        </span>
-      )}
-      {parsed?.isMix && <span className="warn">⚠ Mix listesi sonsuzdur; ilk öğelerle sınırlı olabilir</span>}
-      {error && <div className="error pastebar-error">{error}</div>}
+      {error && <div className="pastebar-error error">{error}</div>}
     </section>
   );
 }

@@ -1,13 +1,9 @@
 // ytdlp-studio:generated v1
-// ytdlp-studio:main v1
 import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
 
-const root = createRoot(document.getElementById("root")!);
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
+createRoot(document.getElementById("root")!).render(
+  <React.StrictMode><App /></React.StrictMode>
 );

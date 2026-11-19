@@ -1,5 +1,5 @@
 // ytdlp-studio:generated v1
-// ytdlp-studio:download-progress v2
+// ytdlp-studio:download v3
 package services
 
 import (
@@ -14,74 +14,105 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lrstanley/go-ytdlp"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"ytdlp-studio/internal/engine"
 	"ytdlp-studio/internal/model"
 )
 
-// TaskProgress tek bir dosyanın indirme durumunu taşır.
 type TaskProgress struct {
-	TaskID   string  `json:"taskId"`
-	State    string  `json:"state"`
-	Percent  float64 `json:"percent"`
-	Speed    float64 `json:"speedBps"`
-	ETA      float64 `json:"etaSec"`
-	Error    string  `json:"error,omitempty"`
-	FilePath string  `json:"filePath,omitempty"`
-	BatchID  string  `json:"batchId,omitempty"`
+	TaskID     string  `json:"taskId"`
+	State      string  `json:"state"`
+	Percent    float64 `json:"percent"`
+	Speed      float64 `json:"speedBps"`
+	ETA        float64 `json:"etaSec"`
+	Error      string  `json:"error,omitempty"`
+	FilePath   string  `json:"filePath,omitempty"`
+	BatchID    string  `json:"batchId,omitempty"`
+	BatchTitle string  `json:"batchTitle,omitempty"`
 }
 
-// BatchProgress bir toplu indirmenin genel ilerlemesini taşır.
-// Current = Completed + Failed (başarısızlar da ilerlemeye dahildir).
+type BatchInfo struct {
+	Title string `json:"title"`
+	ID    string `json:"id"`
+	Kind  string `json:"kind"`
+}
+
 type BatchProgress struct {
-	BatchID   string `json:"batchId"`
-	Total     int    `json:"total"`
-	Completed int    `json:"completed"`
-	Failed    int    `json:"failed"`
-	Current   int    `json:"current"`
-	Done      bool   `json:"done"`
+	BatchID   string  `json:"batchId"`
+	Title     string  `json:"title"`
+	Kind      string  `json:"kind"`
+	Total     int     `json:"total"`
+	Completed int     `json:"completed"`
+	Failed    int     `json:"failed"`
+	Current   int     `json:"current"`
+	Percent   float64 `json:"percent"`
+	Done      bool    `json:"done"`
+}
+
+type LogLine struct {
+	Time   string `json:"time"`
+	TaskID string `json:"taskId,omitempty"`
+	Text   string `json:"text"`
 }
 
 type downloadTask struct {
 	id      string
 	batchID string
+	title   string
 	entry   model.MediaEntry
 	opts    model.DownloadOptions
+	pl      engine.PlaylistContext
 }
 
 type batchState struct {
+	title     string
+	kind      string
 	total     int
 	completed int
 	failed    int
-	mu        sync.Mutex
+	ids       []string
+	states    map[string]string
+	percent   map[string]float64
+	lastEmit  time.Time
 }
 
 func (b *batchState) snapshot(id string) BatchProgress {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	current := b.completed + b.failed
+	sum := 0.0
+	for _, tid := range b.ids {
+		sum += b.percent[tid]
+	}
+	pct := 0.0
+	if b.total > 0 {
+		pct = sum / float64(b.total)
+	}
+	if pct > 100 {
+		pct = 100
+	}
+	cur := b.completed + b.failed
+	done := cur >= b.total
+	if done && b.failed == 0 {
+		pct = 100
+	}
 	return BatchProgress{
-		BatchID:   id,
-		Total:     b.total,
-		Completed: b.completed,
-		Failed:    b.failed,
-		Current:   current,
-		Done:      current >= b.total,
+		BatchID: id, Title: b.title, Kind: b.kind, Total: b.total,
+		Completed: b.completed, Failed: b.failed, Current: cur,
+		Percent: pct, Done: done,
 	}
 }
 
 type DownloadService struct {
-	mu       sync.Mutex
-	queue    chan downloadTask
-	cancels  map[string]context.CancelFunc
-	canceled map[string]bool
-	paused   map[string]bool
-	tasks    map[string]downloadTask
-	states   map[string]string
-	batches  map[string]*batchState
+	mu        sync.Mutex
+	queue     chan downloadTask
+	cancels   map[string]context.CancelFunc
+	canceled  map[string]bool
+	paused    map[string]bool
+	tasks     map[string]downloadTask
+	states    map[string]string
+	percents  map[string]float64
+	batches   map[string]*batchState
 	taskBatch map[string]string
-	seq      int
+	seq       int
+	batchSeq  int
 }
 
 func NewDownloadService(workers int) *DownloadService {
@@ -89,12 +120,13 @@ func NewDownloadService(workers int) *DownloadService {
 		workers = 1
 	}
 	d := &DownloadService{
-		queue:     make(chan downloadTask, 4096),
+		queue:     make(chan downloadTask, 8192),
 		cancels:   map[string]context.CancelFunc{},
 		canceled:  map[string]bool{},
 		paused:    map[string]bool{},
 		tasks:     map[string]downloadTask{},
 		states:    map[string]string{},
+		percents:  map[string]float64{},
 		batches:   map[string]*batchState{},
 		taskBatch: map[string]string{},
 	}
@@ -112,46 +144,86 @@ func (d *DownloadService) PickFolder() (string, error) {
 		PromptForSingleSelection()
 }
 
-// Enqueue seçili girişleri kuyruğa alır.
-func (d *DownloadService) Enqueue(entries []model.MediaEntry, opts model.DownloadOptions) ([]string, error) {
+func (d *DownloadService) PickFile() (string, error) {
+	return application.Get().Dialog.OpenFile().
+		SetTitle("Dosya Seç").
+		CanChooseDirectories(false).
+		CanChooseFiles(true).
+		PromptForSingleSelection()
+}
+
+func (d *DownloadService) Enqueue(entries []model.MediaEntry, opts model.DownloadOptions, batch BatchInfo) ([]string, error) {
 	if err := model.Validate(opts); err != nil {
 		return nil, err
 	}
 	if len(entries) == 0 {
 		return nil, errors.New("seçili öğe yok")
 	}
+	kind := batch.Kind
+	if kind != "playlist" {
+		kind = "file"
+	}
+	if len(entries) > 1 {
+		kind = "playlist"
+	}
+	title := strings.TrimSpace(batch.Title)
+	if title == "" {
+		title = strings.TrimSpace(entries[0].Title)
+	}
+	if title == "" {
+		title = "İndirme"
+	}
+	pl := engine.PlaylistContext{IsPlaylist: kind == "playlist", Title: title, ID: batch.ID}
 
 	ids := make([]string, 0, len(entries))
 	staged := make([]downloadTask, 0, len(entries))
 
 	d.mu.Lock()
-	d.seq++
-	batchID := fmt.Sprintf("batch-%d", d.seq)
-	batch := &batchState{total: len(entries)}
-	d.batches[batchID] = batch
-
-	for _, e := range entries {
+	d.batchSeq++
+	bid := fmt.Sprintf("batch-%d", d.batchSeq)
+	b := &batchState{
+		title: title, kind: kind, total: len(entries),
+		states: map[string]string{}, percent: map[string]float64{},
+	}
+	d.batches[bid] = b
+	for i, e := range entries {
+		if e.Index <= 0 {
+			e.Index = i + 1
+		}
 		d.seq++
 		id := fmt.Sprintf("%s-%d", e.ID, d.seq)
-		t := downloadTask{id: id, batchID: batchID, entry: e, opts: opts}
+		t := downloadTask{id: id, batchID: bid, title: e.Title, entry: e, opts: opts, pl: pl}
 		d.tasks[id] = t
-		d.taskBatch[id] = batchID
+		d.taskBatch[id] = bid
+		d.percents[id] = 0
+		b.ids = append(b.ids, id)
+		b.percent[id] = 0
 		staged = append(staged, t)
 		ids = append(ids, id)
 	}
-	snap := batch.snapshot(batchID)
+	snap := b.snapshot(bid)
 	d.mu.Unlock()
 
 	d.emitBatch(snap)
-
 	for _, t := range staged {
 		d.queue <- t
-		d.emit(TaskProgress{TaskID: t.id, State: "queued", BatchID: t.batchID})
+		d.emit(TaskProgress{TaskID: t.id, State: "queued", BatchID: bid, BatchTitle: title})
 	}
 	return ids, nil
 }
 
-// Cancel aktif görevi iptal eder.
+func (d *DownloadService) activeIDs() []string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	var out []string
+	for id, st := range d.states {
+		if st == "queued" || st == "downloading" || st == "converting" {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
 func (d *DownloadService) Cancel(taskID string) {
 	d.mu.Lock()
 	st := d.states[taskID]
@@ -161,19 +233,19 @@ func (d *DownloadService) Cancel(taskID string) {
 	}
 	d.canceled[taskID] = true
 	cancel := d.cancels[taskID]
+	bid := d.taskBatch[taskID]
 	d.mu.Unlock()
 	if cancel != nil {
 		cancel()
 	}
-	d.emit(TaskProgress{TaskID: taskID, State: "canceled", BatchID: d.batchOf(taskID)})
+	d.finish(taskID, "canceled", "", "")
+	d.recordBatch(bid)
 }
 
-// Pause aktif görevi duraklatır. yt-dlp kaldığı yerden devam edebildiği için
-// Resume ile indirme mümkün olduğunca mevcut dosya üzerinden sürer.
 func (d *DownloadService) Pause(taskID string) {
 	d.mu.Lock()
 	st := d.states[taskID]
-	if st == "done" || st == "error" || st == "canceled" || st == "paused" {
+	if st != "queued" && st != "downloading" && st != "converting" {
 		d.mu.Unlock()
 		return
 	}
@@ -184,32 +256,75 @@ func (d *DownloadService) Pause(taskID string) {
 	if cancel != nil {
 		cancel()
 	}
-	d.emit(TaskProgress{TaskID: taskID, State: "paused", BatchID: d.batchOf(taskID)})
+	d.finish(taskID, "paused", "", "")
 }
 
-// Resume duraklatılmış veya başarısız görevi yeniden kuyruğa alır.
 func (d *DownloadService) Resume(taskID string) error {
 	d.mu.Lock()
 	t, ok := d.tasks[taskID]
+	bid := d.taskBatch[taskID]
+	var snap *BatchProgress
 	if ok {
 		delete(d.canceled, taskID)
 		delete(d.paused, taskID)
+		d.percents[taskID] = 0
+		if b := d.batches[bid]; b != nil {
+			switch b.states[taskID] {
+			case "done":
+				if b.completed > 0 {
+					b.completed--
+				}
+			case "error", "canceled":
+				if b.failed > 0 {
+					b.failed--
+				}
+			}
+			delete(b.states, taskID)
+			b.percent[taskID] = 0
+			s := b.snapshot(bid)
+			snap = &s
+		}
 	}
 	d.mu.Unlock()
 	if !ok {
 		return fmt.Errorf("görev bulunamadı: %s", taskID)
 	}
 	d.queue <- t
-	d.emit(TaskProgress{TaskID: taskID, State: "queued", BatchID: t.batchID})
+	d.emit(TaskProgress{TaskID: taskID, State: "queued", BatchID: bid, BatchTitle: t.title})
+	if snap != nil {
+		d.emitBatch(*snap)
+	}
 	return nil
 }
 
-// Retry, Resume ile aynı davranışı sunar (hata/iptal sonrası yeniden dener).
-func (d *DownloadService) Retry(taskID string) error {
-	return d.Resume(taskID)
+func (d *DownloadService) Retry(taskID string) error { return d.Resume(taskID) }
+
+func (d *DownloadService) PauseAll() {
+	for _, id := range d.activeIDs() {
+		d.Pause(id)
+	}
 }
 
-// Remove görevi listeden ve backend kaydından siler; aktifse iptal eder.
+func (d *DownloadService) ResumeAll() {
+	d.mu.Lock()
+	var ids []string
+	for id, st := range d.states {
+		if st == "paused" {
+			ids = append(ids, id)
+		}
+	}
+	d.mu.Unlock()
+	for _, id := range ids {
+		_ = d.Resume(id)
+	}
+}
+
+func (d *DownloadService) CancelAll() {
+	for _, id := range d.activeIDs() {
+		d.Cancel(id)
+	}
+}
+
 func (d *DownloadService) Remove(taskID string) {
 	d.mu.Lock()
 	cancel := d.cancels[taskID]
@@ -218,6 +333,7 @@ func (d *DownloadService) Remove(taskID string) {
 	delete(d.canceled, taskID)
 	delete(d.paused, taskID)
 	delete(d.cancels, taskID)
+	delete(d.percents, taskID)
 	delete(d.taskBatch, taskID)
 	d.mu.Unlock()
 	if cancel != nil {
@@ -225,44 +341,23 @@ func (d *DownloadService) Remove(taskID string) {
 	}
 }
 
-// ClearFinished bitmiş görevleri backend kaydından temizler.
 func (d *DownloadService) ClearFinished() {
 	d.mu.Lock()
-	for id := range d.tasks {
-		switch d.states[id] {
+	for id, st := range d.states {
+		switch st {
 		case "done", "canceled", "error":
 			delete(d.tasks, id)
 			delete(d.states, id)
 			delete(d.canceled, id)
 			delete(d.paused, id)
 			delete(d.cancels, id)
+			delete(d.percents, id)
 			delete(d.taskBatch, id)
 		}
 	}
 	d.mu.Unlock()
 }
 
-// CancelAll aktif/bekleyen tüm görevleri iptal eder.
-func (d *DownloadService) CancelAll() {
-	d.mu.Lock()
-	var cancels []context.CancelFunc
-	for id := range d.tasks {
-		st := d.states[id]
-		if st == "done" || st == "error" || st == "canceled" {
-			continue
-		}
-		d.canceled[id] = true
-		if c := d.cancels[id]; c != nil {
-			cancels = append(cancels, c)
-		}
-	}
-	d.mu.Unlock()
-	for _, c := range cancels {
-		c()
-	}
-}
-
-// ClearAll tüm görevleri iptal eder ve kayıtları temizler.
 func (d *DownloadService) ClearAll() {
 	d.mu.Lock()
 	var cancels []context.CancelFunc
@@ -274,8 +369,10 @@ func (d *DownloadService) ClearAll() {
 	}
 	d.tasks = map[string]downloadTask{}
 	d.states = map[string]string{}
+	d.percents = map[string]float64{}
 	d.paused = map[string]bool{}
 	d.taskBatch = map[string]string{}
+	d.batches = map[string]*batchState{}
 	d.mu.Unlock()
 	for _, c := range cancels {
 		c()
@@ -286,50 +383,33 @@ func (d *DownloadService) Reveal(path string) error {
 	if path == "" {
 		return errors.New("dosya yolu boş")
 	}
-	st, err := os.Stat(path)
-	switch {
-	case err == nil && st.IsDir():
-		return revealPath(path, false)
-	case err == nil:
-		return revealPath(path, true)
-	default:
+	target, selectFile := path, false
+	if st, err := os.Stat(path); err != nil {
 		dir := filepath.Dir(path)
-		if _, e := os.Stat(dir); e == nil {
-			return revealPath(dir, false)
+		if _, e := os.Stat(dir); e != nil {
+			return fmt.Errorf("dosya bulunamadı: %s", path)
 		}
-		return fmt.Errorf("dosya bulunamadı: %s", path)
+		target = dir
+	} else if !st.IsDir() {
+		selectFile = true
 	}
-}
-
-func revealPath(path string, selectFile bool) error {
 	switch runtime.GOOS {
 	case "darwin":
 		if selectFile {
-			return exec.Command("open", "-R", path).Run()
+			return exec.Command("open", "-R", target).Run()
 		}
-		return exec.Command("open", path).Run()
+		return exec.Command("open", target).Run()
 	case "windows":
 		if selectFile {
-			return exec.Command("explorer.exe", "/select,", path).Run()
+			return exec.Command("explorer.exe", "/select,", target).Run()
 		}
-		return exec.Command("explorer.exe", path).Run()
-	case "linux":
-		// xdg-open genellikle dizinleri ve dosyaları açabilir
-		if selectFile {
-			dir := filepath.Dir(path)
-			return exec.Command("xdg-open", dir).Run()
-		}
-		return exec.Command("xdg-open", path).Run()
+		return exec.Command("explorer.exe", target).Run()
 	default:
-		return fmt.Errorf("bu özellik %s platformunda desteklenmiyor", runtime.GOOS)
+		if selectFile {
+			target = filepath.Dir(target)
+		}
+		return exec.Command("xdg-open", target).Run()
 	}
-}
-
-
-func (d *DownloadService) batchOf(taskID string) string {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	return d.taskBatch[taskID]
 }
 
 func (d *DownloadService) worker() {
@@ -344,12 +424,44 @@ func (d *DownloadService) worker() {
 	}
 }
 
+func subExt(ext string) bool {
+	switch strings.ToLower(ext) {
+	case ".srt", ".vtt", ".ass", ".ssa", ".lrc", ".ttml", ".sbv":
+		return true
+	}
+	return false
+}
+
+func (d *DownloadService) finalPath(t downloadTask, lastFile string) string {
+	if lastFile == "" {
+		return t.opts.OutputDir
+	}
+	switch t.opts.Mode {
+	case "audio":
+		p := strings.TrimSuffix(lastFile, filepath.Ext(lastFile)) + "." + t.opts.AudioFormat
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+		return lastFile
+	case "subtitle":
+		base := strings.TrimSuffix(lastFile, filepath.Ext(lastFile))
+		matches, _ := filepath.Glob(base + ".*")
+		for _, m := range matches {
+			if subExt(filepath.Ext(m)) {
+				return m
+			}
+		}
+		return filepath.Dir(lastFile)
+	default:
+		return lastFile
+	}
+}
+
 func (d *DownloadService) run(t downloadTask) {
 	ctx, cancel := context.WithCancel(context.Background())
 	d.mu.Lock()
 	d.cancels[t.id] = cancel
 	d.mu.Unlock()
-
 	defer func() {
 		cancel()
 		d.mu.Lock()
@@ -359,105 +471,137 @@ func (d *DownloadService) run(t downloadTask) {
 
 	var fm sync.Mutex
 	lastFile := ""
-	started := time.Now()
 
-	cmd := engine.BuildCommand(t.opts, t.entry).ProgressFunc(300*time.Millisecond, func(p ytdlp.ProgressUpdate) {
-		fm.Lock()
-		if p.Filename != "" {
-			lastFile = p.Filename
-		}
-		fm.Unlock()
+	hooks := engine.Hooks{
+		OnProgress: func(p engine.Progress) {
+			pct := 0.0
+			if p.Total > 0 {
+				pct = p.Downloaded / p.Total * 100
+			}
+			if pct > 100 {
+				pct = 100
+			}
+			if p.Filename != "" {
+				fm.Lock()
+				lastFile = p.Filename
+				fm.Unlock()
+			}
+			d.emit(TaskProgress{
+				TaskID: t.id, State: "downloading", Percent: pct,
+				Speed: p.Speed, ETA: p.ETA, BatchID: t.batchID, BatchTitle: t.title,
+			})
+			d.touchBatch(t.id, pct)
+		},
+		OnPostprocess: func(name string) {
+			d.emit(TaskProgress{
+				TaskID: t.id, State: "converting", Percent: 100,
+				BatchID: t.batchID, BatchTitle: t.title,
+			})
+			d.log(t.id, "postprocess: "+name)
+		},
+		OnFile: func(p string) {
+			fm.Lock()
+			lastFile = p
+			fm.Unlock()
+		},
+		OnLog: func(line string) { d.log(t.id, line) },
+	}
 
-		total := p.TotalBytes
-		pct := 0.0
-		if total > 0 {
-			pct = float64(p.DownloadedBytes) / float64(total) * 100
-		}
-
-		state := "downloading"
-		if string(p.Status) == "finished" || string(p.Status) == "post_processing" {
-			state = "converting"
-			pct = 100
-		}
-
-		speed := 0.0
-		if el := time.Since(started).Seconds(); el > 0 {
-			speed = float64(p.DownloadedBytes) / el
-		}
-
-		eta := 0.0
-		if p.ETA != nil {
-			eta = p.ETA().Seconds()
-		}
-
-		d.emit(TaskProgress{
-			TaskID:  t.id,
-			State:   state,
-			Percent: pct,
-			Speed:   speed,
-			ETA:     eta,
-			BatchID: t.batchID,
-		})
-	})
-
-	d.emit(TaskProgress{TaskID: t.id, State: "downloading", BatchID: t.batchID})
-
-	_, err := cmd.Run(ctx, t.entry.URL)
+	d.emit(TaskProgress{TaskID: t.id, State: "downloading", BatchID: t.batchID, BatchTitle: t.title})
+	err := engine.RunDownload(ctx, engine.BuildArgs(t.opts, t.entry, t.pl), hooks)
 
 	d.mu.Lock()
 	wasCanceled := d.canceled[t.id]
 	wasPaused := d.paused[t.id]
 	d.mu.Unlock()
 
+	fm.Lock()
+	lf := lastFile
+	fm.Unlock()
+
 	switch {
 	case wasPaused:
-		d.emit(TaskProgress{TaskID: t.id, State: "paused", BatchID: t.batchID})
+		d.finish(t.id, "paused", "", "")
 	case wasCanceled || ctx.Err() != nil:
-		d.emit(TaskProgress{TaskID: t.id, State: "canceled", BatchID: t.batchID})
-		d.recordBatch(t.batchID, false)
+		d.finish(t.id, "canceled", "", "")
+		d.recordBatch(t.batchID)
 	case err != nil:
-		d.emit(TaskProgress{TaskID: t.id, State: "error", Error: err.Error(), BatchID: t.batchID})
-		d.recordBatch(t.batchID, false)
+		d.finish(t.id, "error", err.Error(), "")
+		d.recordBatch(t.batchID)
 	default:
-		fm.Lock()
-		fp := lastFile
-		fm.Unlock()
-		if t.opts.Mode == "audio" && fp != "" {
-			fp = strings.TrimSuffix(fp, filepath.Ext(fp)) + "." + t.opts.AudioFormat
-		}
-		d.emit(TaskProgress{TaskID: t.id, State: "done", Percent: 100, FilePath: fp, BatchID: t.batchID})
-		d.recordBatch(t.batchID, true)
+		d.finish(t.id, "done", "", d.finalPath(t, lf))
+		d.recordBatch(t.batchID)
 	}
 }
 
-// recordBatch batch sayacını günceller; bitişte batch:completed yayınlar.
-func (d *DownloadService) recordBatch(batchID string, success bool) {
+func (d *DownloadService) finish(taskID, state, errMsg, filePath string) {
+	d.mu.Lock()
+	t, ok := d.tasks[taskID]
+	pct := d.percents[taskID]
+	if state == "done" {
+		pct = 100
+		d.percents[taskID] = 100
+	}
+	d.mu.Unlock()
+	if !ok {
+		return
+	}
+	d.emit(TaskProgress{
+		TaskID: taskID, State: state, Percent: pct, Error: errMsg, FilePath: filePath,
+		BatchID: t.batchID, BatchTitle: t.title,
+	})
+}
+
+func (d *DownloadService) touchBatch(taskID string, pct float64) {
+	d.mu.Lock()
+	d.percents[taskID] = pct
+	b := d.batches[d.taskBatch[taskID]]
+	var snap *BatchProgress
+	if b != nil {
+		b.percent[taskID] = pct
+		if time.Since(b.lastEmit) >= 400*time.Millisecond {
+			b.lastEmit = time.Now()
+			s := b.snapshot(d.taskBatch[taskID])
+			snap = &s
+		}
+	}
+	d.mu.Unlock()
+	if snap != nil {
+		d.emitBatch(*snap)
+	}
+}
+
+func (d *DownloadService) recordBatch(batchID string) {
 	if batchID == "" {
 		return
 	}
 	d.mu.Lock()
 	b := d.batches[batchID]
+	var snap *BatchProgress
+	if b != nil {
+		b.completed, b.failed = 0, 0
+		for _, id := range b.ids {
+			switch b.states[id] {
+			case "done":
+				b.completed++
+			case "error", "canceled":
+				b.failed++
+			}
+		}
+		s := b.snapshot(batchID)
+		snap = &s
+	}
 	d.mu.Unlock()
-	if b == nil {
-		return
-	}
-
-	b.mu.Lock()
-	if success {
-		b.completed++
-	} else {
-		b.failed++
-	}
-	b.mu.Unlock()
-
-	snap := b.snapshot(batchID)
-	d.emitBatch(snap)
-	if snap.Done {
-		d.emitBatchCompleted(snap)
+	if snap != nil {
+		d.emitBatch(*snap)
+		if snap.Done {
+			if app := application.Get(); app != nil {
+				app.Event.Emit("batch:completed", *snap)
+			}
+		}
 	}
 }
 
-// emit, task durumunu yayınlar. Temizlenmiş görevler için emit yapılmaz.
 func (d *DownloadService) emit(p TaskProgress) {
 	d.mu.Lock()
 	if _, ok := d.tasks[p.TaskID]; !ok {
@@ -465,8 +609,16 @@ func (d *DownloadService) emit(p TaskProgress) {
 		return
 	}
 	d.states[p.TaskID] = p.State
+	if b := d.batches[d.taskBatch[p.TaskID]]; b != nil {
+		switch p.State {
+		case "done", "error", "canceled":
+			b.states[p.TaskID] = p.State
+			if p.State == "done" {
+				b.percent[p.TaskID] = 100
+			}
+		}
+	}
 	d.mu.Unlock()
-
 	if app := application.Get(); app != nil {
 		app.Event.Emit("task:progress", p)
 	}
@@ -478,8 +630,10 @@ func (d *DownloadService) emitBatch(p BatchProgress) {
 	}
 }
 
-func (d *DownloadService) emitBatchCompleted(p BatchProgress) {
+func (d *DownloadService) log(taskID, text string) {
 	if app := application.Get(); app != nil {
-		app.Event.Emit("batch:completed", p)
+		app.Event.Emit("log:line", LogLine{
+			Time: time.Now().Format("15:04:05"), TaskID: taskID, Text: text,
+		})
 	}
 }

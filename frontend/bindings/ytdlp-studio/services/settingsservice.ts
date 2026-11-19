@@ -9,10 +9,37 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 // @ts-ignore: Unused imports
 import * as model$0 from "../internal/model/models.js";
 
+export function ConfigPath(): $CancellablePromise<string> {
+    return $Call.ByID(1189900099);
+}
+
 export function Load(): $CancellablePromise<model$0.DownloadOptions> {
     return $Call.ByID(1712621426);
 }
 
+export function LoadApp(): $CancellablePromise<model$0.AppSettings> {
+    return $Call.ByID(3291920273);
+}
+
+/**
+ * PreviewArgs seçili ayarlarla üretilecek yt-dlp komutunu gösterir.
+ */
+export function PreviewArgs(o: model$0.DownloadOptions): $CancellablePromise<string[] | null> {
+    return $Call.ByID(3280501647, o);
+}
+
+export function Reset(): $CancellablePromise<model$0.DownloadOptions> {
+    return $Call.ByID(2997875165);
+}
+
+export function ResetApp(): $CancellablePromise<model$0.AppSettings> {
+    return $Call.ByID(3395919764);
+}
+
 export function Save(o: model$0.DownloadOptions): $CancellablePromise<void> {
     return $Call.ByID(43310279, o);
+}
+
+export function SaveApp(a: model$0.AppSettings): $CancellablePromise<void> {
+    return $Call.ByID(4212984546, a);
 }

@@ -1,0 +1,136 @@
+# ytdlp-studio:release v1
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Yayınlanacak etiket (örn. v1.0.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.goos }}_${{ matrix.goarch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14
+            goos: darwin
+            goarch: arm64
+            ext: ""
+          - runner: macos-14
+            goos: darwin
+            goarch: amd64
+            ext: ""
+          - runner: ubuntu-24.04
+            goos: linux
+            goarch: amd64
+            ext: ""
+          - runner: ubuntu-24.04-arm
+            goos: linux
+            goarch: arm64
+            ext: ""
+          - runner: windows-latest
+            goos: windows
+            goarch: amd64
+            ext: ".exe"
+          - runner: windows-latest
+            goos: windows
+            goarch: arm64
+            ext: ".exe"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.x"
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Wails v3 CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+
+      - name: Linux GUI dependencies (GTK4 + WebKitGTK 6.0)
+        if: matrix.goos == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev libsoup-3.0-dev pkg-config build-essential
+
+      - name: Frontend build
+        working-directory: frontend
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+
+      - name: Generate bindings
+        run: wails3 generate bindings -clean=true -ts -i
+
+      - name: Windows resource (syso)
+        if: matrix.goos == 'windows'
+        shell: bash
+        run: |
+          wails3 generate syso -arch ${{ matrix.goarch }} \
+            -icon build/windows/icon.ico \
+            -manifest build/windows/wails.exe.manifest \
+            -info build/windows/info.json \
+            -out wails_windows_${{ matrix.goarch }}.syso || true
+
+      - name: Go build
+        shell: bash
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: ${{ matrix.goos == 'windows' && '0' || '1' }}
+        run: |
+          mkdir -p dist
+          LDFLAGS="-w -s"
+          if [ "${{ matrix.goos }}" = "windows" ]; then LDFLAGS="$LDFLAGS -H windowsgui"; fi
+          go build -tags production -trimpath -buildvcs=false \
+            -ldflags="$LDFLAGS" \
+            -o "dist/ytdlp-studio_${{ matrix.goos }}_${{ matrix.goarch }}${{ matrix.ext }}"
+          rm -f *.syso
+
+      - name: Ad-hoc codesign (macOS)
+        if: matrix.goos == 'darwin'
+        run: codesign --force --sign - "dist/ytdlp-studio_darwin_${{ matrix.goarch }}" || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ytdlp-studio_${{ matrix.goos }}_${{ matrix.goarch }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Checksums
+        run: |
+          cd artifacts
+          chmod +x ytdlp-studio_darwin_* ytdlp-studio_linux_* || true
+          sha256sum ytdlp-studio_* > checksums.txt
+          ls -lh
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: ${{ github.event.inputs.tag || github.ref_name }}
+          generate_release_notes: true
+          files: artifacts/*

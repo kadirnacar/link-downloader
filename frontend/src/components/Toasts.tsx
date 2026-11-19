@@ -1,52 +1,34 @@
 // ytdlp-studio:generated v1
-// ytdlp-studio:toasts v2
 import { useEffect, useState } from "react";
 import { Events } from "@wailsio/runtime";
+import { useStore } from "../store";
 import type { BatchProgress } from "../types";
 
-interface ToastItem {
-  id: number;
-  message: string;
-  kind: "" | "good" | "bad";
-}
-
-let toastSeq = 0;
+interface T { id: number; text: string; kind: string; }
+let seq = 0;
 
 export function Toasts() {
-  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [items, setItems] = useState<T[]>([]);
+  const notifications = useStore((s) => s.app.notifications);
 
   useEffect(() => {
     const off = Events.On("batch:completed", (ev) => {
       const b = ev.data as BatchProgress;
-      if (!b) return;
-      if (b.failed > 0) {
-        pushToast(`İndirme bitti: ${b.completed} başarılı, ${b.failed} hatalı.`, "bad");
-      } else {
-        pushToast(`İndirme tamamlandı: ${b.completed}/${b.total} dosya hazır.`, "good");
-      }
+      if (!b || !notifications) return;
+      const id = ++seq;
+      const text = b.failed > 0
+        ? `İndirme bitti: ${b.completed} başarılı, ${b.failed} hatalı.`
+        : `İndirme tamamlandı: ${b.completed}/${b.total} hazır.`;
+      setItems((p) => [...p, { id, text, kind: b.failed > 0 ? "bad" : "good" }]);
+      setTimeout(() => setItems((p) => p.filter((x) => x.id !== id)), 5000);
     });
-    return () => {
-      off();
-    };
-  }, []);
+    return () => { off(); };
+  }, [notifications]);
 
-  function pushToast(message: string, kind: "" | "good" | "bad") {
-    const id = ++toastSeq;
-    setToasts((prev) => [...prev, { id, message, kind }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 5000);
-  }
-
-  if (toasts.length === 0) return null;
-
+  if (items.length === 0) return null;
   return (
     <div className="toast-wrap">
-      {toasts.map((t) => (
-        <div key={t.id} className={"toast " + t.kind}>
-          {t.message}
-        </div>
-      ))}
+      {items.map((t) => <div key={t.id} className={"toast " + t.kind}>{t.text}</div>)}
     </div>
   );
 }

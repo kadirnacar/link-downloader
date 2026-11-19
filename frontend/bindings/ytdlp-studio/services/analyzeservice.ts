@@ -9,10 +9,21 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 // @ts-ignore: Unused imports
 import * as model$0 from "../internal/model/models.js";
 
-export function Analyze(raw: string, scope: string): $CancellablePromise<model$0.MediaInfo | null> {
-    return $Call.ByID(2519199345, raw, scope);
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as $models from "./models.js";
+
+export function Analyze(raw: string, scope: string, playlistItems: string): $CancellablePromise<model$0.MediaInfo | null> {
+    return $Call.ByID(2519199345, raw, scope, playlistItems);
 }
 
 export function ParseURL(raw: string): $CancellablePromise<model$0.ParsedURL> {
     return $Call.ByID(2674426019, raw);
+}
+
+/**
+ * Subtitles bir videonun mevcut altyazı dillerini listeler.
+ */
+export function Subtitles(raw: string): $CancellablePromise<$models.SubtitleInfo | null> {
+    return $Call.ByID(238193800, raw);
 }

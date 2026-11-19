@@ -9,70 +9,58 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 // @ts-ignore: Unused imports
 import * as model$0 from "../internal/model/models.js";
 
-/**
- * Cancel aktif görevi iptal eder.
- */
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as $models from "./models.js";
+
 export function Cancel(taskID: string): $CancellablePromise<void> {
     return $Call.ByID(4020361725, taskID);
 }
 
-/**
- * CancelAll aktif/bekleyen tüm görevleri iptal eder.
- */
 export function CancelAll(): $CancellablePromise<void> {
     return $Call.ByID(3115124652);
 }
 
-/**
- * ClearAll tüm görevleri iptal eder ve kayıtları temizler.
- */
 export function ClearAll(): $CancellablePromise<void> {
     return $Call.ByID(2422241791);
 }
 
-/**
- * ClearFinished bitmiş görevleri backend kaydından temizler.
- */
 export function ClearFinished(): $CancellablePromise<void> {
     return $Call.ByID(176299922);
 }
 
-/**
- * Enqueue seçili girişleri kuyruğa alır.
- */
-export function Enqueue(entries: model$0.MediaEntry[] | null, opts: model$0.DownloadOptions): $CancellablePromise<string[] | null> {
-    return $Call.ByID(4164065459, entries, opts);
+export function Enqueue(entries: model$0.MediaEntry[] | null, opts: model$0.DownloadOptions, batch: $models.BatchInfo): $CancellablePromise<string[] | null> {
+    return $Call.ByID(4164065459, entries, opts, batch);
 }
 
-/**
- * Pause aktif görevi duraklatır. yt-dlp kaldığı yerden devam edebildiği için
- * Resume ile indirme mümkün olduğunca mevcut dosya üzerinden sürer.
- */
 export function Pause(taskID: string): $CancellablePromise<void> {
     return $Call.ByID(3130149619, taskID);
+}
+
+export function PauseAll(): $CancellablePromise<void> {
+    return $Call.ByID(2539368038);
+}
+
+export function PickFile(): $CancellablePromise<string> {
+    return $Call.ByID(1104627528);
 }
 
 export function PickFolder(): $CancellablePromise<string> {
     return $Call.ByID(3214344798);
 }
 
-/**
- * Remove görevi listeden ve backend kaydından siler; aktifse iptal eder.
- */
 export function Remove(taskID: string): $CancellablePromise<void> {
     return $Call.ByID(1145029991, taskID);
 }
 
-/**
- * Resume duraklatılmış veya başarısız görevi yeniden kuyruğa alır.
- */
 export function Resume(taskID: string): $CancellablePromise<void> {
     return $Call.ByID(4128064992, taskID);
 }
 
-/**
- * Retry, Resume ile aynı davranışı sunar (hata/iptal sonrası yeniden dener).
- */
+export function ResumeAll(): $CancellablePromise<void> {
+    return $Call.ByID(1164478835);
+}
+
 export function Retry(taskID: string): $CancellablePromise<void> {
     return $Call.ByID(2612158899, taskID);
 }

@@ -1,171 +1,89 @@
 // ytdlp-studio:generated v1
-// ytdlp-studio:options v1
-import { DownloadService } from "../api";
 import { useStore } from "../store";
-import type { DownloadOptions } from "../types";
-
-const NAME_PRESETS = [
-  "%(playlist_index)03d - %(title)s.%(ext)s",
-  "%(title)s.%(ext)s",
-  "%(uploader)s/%(title)s.%(ext)s",
-];
 
 export function OptionsPanel() {
-  const options = useStore((s) => s.options);
+  const o = useStore((s) => s.options);
+  const patch = useStore((s) => s.patchOptions);
   const set = useStore((s) => s.set);
-  const upd = (p: Partial<DownloadOptions>) => set({ options: { ...options, ...p } });
-
-  async function pickFolder() {
-    try {
-      const dir = await DownloadService.PickFolder();
-      if (dir) upd({ outputDir: dir });
-    } catch {
-      // kullanıcı dialogu iptal etti
-    }
-  }
 
   return (
-    <aside className="options">
+    <aside className="card options">
       <div className="card-head">
-        <h3>İndirme Kuralları</h3>
-        <span className="tag">Ayarlar</span>
+        <h3>Hızlı kurallar</h3>
+        <button className="btn small" onClick={() => set({ tab: "settings", settingsSection: "download" })}>Tüm ayarlar</button>
       </div>
 
-      <div className="seg">
-        <button className={options.mode === "audio" ? "active" : ""} onClick={() => upd({ mode: "audio" })}>
-          🎵 Ses
-        </button>
-        <button className={options.mode === "video" ? "active" : ""} onClick={() => upd({ mode: "video" })}>
-          🎬 Video
-        </button>
+      <div className="seg three">
+        <button className={o.mode === "audio" ? "active" : ""} onClick={() => patch({ mode: "audio" })}>🎵 Ses</button>
+        <button className={o.mode === "video" ? "active" : ""} onClick={() => patch({ mode: "video" })}>🎬 Video</button>
+        <button className={o.mode === "subtitle" ? "active" : ""} onClick={() => patch({ mode: "subtitle" })}>≡ Altyazı</button>
       </div>
 
-      {options.mode === "audio" ? (
-        <>
-          <label>
-            Format
-            <select value={options.audioFormat} onChange={(e) => upd({ audioFormat: e.target.value })}>
-              {["mp3", "m4a", "opus", "flac", "wav"].map((f) => (
-                <option key={f} value={f}>
-                  {f.toUpperCase()}
-                </option>
-              ))}
+      {o.mode === "audio" && (
+        <div className="field">
+          <label>Format / kalite</label>
+          <div className="inline">
+            <select value={o.audioFormat} onChange={(e) => patch({ audioFormat: e.target.value })}>
+              {["mp3", "m4a", "opus", "flac", "wav"].map((f) => <option key={f} value={f}>{f.toUpperCase()}</option>)}
             </select>
-          </label>
-          <label>
-            Kalite
-            <select value={options.audioQuality} onChange={(e) => upd({ audioQuality: e.target.value })}>
-              <option value="0">En iyi (VBR)</option>
-              {["320K", "256K", "192K", "128K"].map((q) => (
-                <option key={q} value={q}>
-                  {q}
-                </option>
-              ))}
+            <select value={o.audioQuality} onChange={(e) => patch({ audioQuality: e.target.value })}>
+              <option value="0">En iyi</option>
+              {["320K", "256K", "192K", "128K"].map((q) => <option key={q} value={q}>{q}</option>)}
             </select>
-          </label>
-        </>
-      ) : (
-        <>
-          <label>
-            Çözünürlük
-            <select value={options.videoHeight} onChange={(e) => upd({ videoHeight: Number(e.target.value) })}>
+          </div>
+        </div>
+      )}
+
+      {o.mode === "video" && (
+        <div className="field">
+          <label>Çözünürlük / kap</label>
+          <div className="inline">
+            <select value={o.videoHeight} onChange={(e) => patch({ videoHeight: Number(e.target.value) })}>
               <option value={0}>En iyi</option>
-              {[2160, 1440, 1080, 720, 480].map((h) => (
-                <option key={h} value={h}>
-                  {h}p
-                </option>
-              ))}
+              {[2160, 1440, 1080, 720, 480].map((h) => <option key={h} value={h}>{h}p</option>)}
             </select>
-          </label>
-          <label>
-            Kap
-            <select value={options.videoContainer} onChange={(e) => upd({ videoContainer: e.target.value })}>
-              {["mp4", "mkv", "webm"].map((c) => (
-                <option key={c} value={c}>
-                  {c.toUpperCase()}
-                </option>
-              ))}
+            <select value={o.videoContainer} onChange={(e) => patch({ videoContainer: e.target.value })}>
+              {["mp4", "mkv", "webm"].map((c) => <option key={c} value={c}>{c.toUpperCase()}</option>)}
             </select>
+          </div>
+        </div>
+      )}
+
+      {o.mode !== "audio" && (
+        <>
+          <div className="field">
+            <label>Altyazı dilleri</label>
+            <input value={o.subLangs} placeholder="tr,en" onChange={(e) => patch({ subLangs: e.target.value })} />
+          </div>
+          <div className="field">
+            <label>Altyazı formatı</label>
+            <select value={o.subFormat} onChange={(e) => patch({ subFormat: e.target.value })}>
+              {["srt", "vtt", "ass", "lrc", "best"].map((f) => <option key={f} value={f}>{f.toUpperCase()}</option>)}
+            </select>
+          </div>
+          <label className="switch">
+            <input type="checkbox" checked={o.subAutoGenerated} onChange={(e) => patch({ subAutoGenerated: e.target.checked })} />
+            <span>Otomatik altyazıları da al</span>
           </label>
+          {o.mode === "video" && (
+            <>
+              <label className="switch">
+                <input type="checkbox" checked={o.subtitlesEnabled} onChange={(e) => patch({ subtitlesEnabled: e.target.checked })} />
+                <span>Altyazı indir</span>
+              </label>
+              <label className="switch">
+                <input type="checkbox" checked={o.embedSubtitles} onChange={(e) => patch({ embedSubtitles: e.target.checked })} />
+                <span>Videoya göm</span>
+              </label>
+            </>
+          )}
         </>
       )}
 
-      <label>
-        Klasör
-        <div className="folder-row">
-          <input readOnly value={options.outputDir} placeholder="Seçilmedi" />
-          <button className="btn" onClick={() => void pickFolder()}>
-            Seç…
-          </button>
-        </div>
-      </label>
-
-      <label>
-        Dosya adı
-        <select value={options.nameTemplate} onChange={(e) => upd({ nameTemplate: e.target.value })}>
-          {NAME_PRESETS.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label className="check">
-        <input
-          type="checkbox"
-          checked={options.embedThumbnail}
-          onChange={(e) => upd({ embedThumbnail: e.target.checked })}
-        />
-        Kapak göm
-      </label>
-      <label className="check">
-        <input
-          type="checkbox"
-          checked={options.embedMetadata}
-          onChange={(e) => upd({ embedMetadata: e.target.checked })}
-        />
-        Metadata göm
-      </label>
-
-      <details>
-        <summary>Gelişmiş</summary>
-        <label>
-          Hız limiti
-          <input
-            placeholder="ör. 5M (boş = limitsiz)"
-            value={options.rateLimit}
-            onChange={(e) => upd({ rateLimit: e.target.value })}
-          />
-        </label>
-        <label>
-          Eşzamanlı parça
-          <select
-            value={options.concurrentFragments}
-            onChange={(e) => upd({ concurrentFragments: Number(e.target.value) })}
-          >
-            {[1, 2, 4, 8].map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Çerezler
-          <select
-            value={options.cookiesBrowser}
-            onChange={(e) => upd({ cookiesBrowser: e.target.value })}
-          >
-            <option value="">Kullanma</option>
-            {["chrome", "safari", "firefox", "brave", "edge"].map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
-        </label>
-      </details>
+      <div className="field">
+        <label>Klasör</label>
+        <input readOnly value={o.outputDir} placeholder="Ayarlar > Dosya bölümünden seçin" />
+      </div>
     </aside>
   );
 }

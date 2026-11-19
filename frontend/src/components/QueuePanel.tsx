@@ -1,23 +1,8 @@
 // ytdlp-studio:generated v1
-// ytdlp-studio:queue v2
 import { DownloadService } from "../api";
-import { useTasks } from "../taskStore";
 import { useStore } from "../store";
-
-function fmtSpeed(bps: number): string {
-  if (!bps || bps <= 0) return "";
-  return (bps / (1024 * 1024)).toFixed(1) + " MB/s";
-}
-
-const STATE_LABEL: Record<string, string> = {
-  queued: "Sırada",
-  downloading: "İndiriliyor",
-  converting: "Dönüştürülüyor",
-  paused: "Duraklatıldı",
-  done: "Tamamlandı",
-  error: "Hata",
-  canceled: "İptal",
-};
+import { useTasks } from "../taskStore";
+import { fmtEta, fmtSpeed, pct, STATE_LABEL, stateClass } from "../lib/format";
 
 export function QueuePanel() {
   const tasks = useTasks((s) => s.tasks);
@@ -26,151 +11,66 @@ export function QueuePanel() {
   const clearFinished = useTasks((s) => s.clearFinished);
   const clearAll = useTasks((s) => s.clearAll);
   const batches = useStore((s) => s.batches);
+  const app = useStore((s) => s.app);
 
-  if (order.length === 0) {
-    return <section className="preview empty">Kuyruk boş. Analiz sekmesinden indirme başlat.</section>;
+  const ids = new Set<string>();
+  order.forEach((id) => { const b = tasks[id]?.batchId; if (b) ids.add(b); });
+  const list = [...ids].map((id) => batches[id]).filter(Boolean);
+
+  const total = list.reduce((a, b) => a + b.total, 0);
+  const done = list.reduce((a, b) => a + b.completed, 0);
+  const failed = list.reduce((a, b) => a + b.failed, 0);
+  const current = list.reduce((a, b) => a + b.current, 0);
+  const percent = total > 0 ? (current / total) * 100 : 0;
+  const finished = list.length > 0 && list.every((b) => b.done);
+
+  async function clear(kind: "finished" | "all") {
+    if (app.confirmClearQueue && !window.confirm(kind === "all" ? "Tüm kuyruk temizlensin mi?" : "Bitenler temizlensin mi?")) return;
+    if (kind === "all") { await DownloadService.ClearAll(); clearAll(); }
+    else { await DownloadService.ClearFinished(); clearFinished(); }
   }
 
-  const activeBatchIds = new Set<string>();
-  for (const id of order) {
-    const t = tasks[id];
-    if (t?.batchId) activeBatchIds.add(t.batchId);
-  }
-  const activeBatches = [...activeBatchIds]
-    .map((id) => batches[id])
-    .filter((b): b is NonNullable<typeof b> => Boolean(b));
-
-  async function handleClearFinished() {
-    try {
-      await DownloadService.ClearFinished();
-    } catch {
-      // yoksay
-    }
-    clearFinished();
-  }
-
-  async function handleClearAll() {
-    try {
-      await DownloadService.ClearAll();
-    } catch {
-      // yoksay
-    }
-    clearAll();
-  }
-
-  async function handleCancelAll() {
-    try {
-      await DownloadService.CancelAll();
-    } catch {
-      // yoksay
-    }
-  }
-
-  async function handleRemove(id: string) {
-    try {
-      await DownloadService.Remove(id);
-    } catch {
-      // yoksay
-    }
-    removeOne(id);
-  }
+  if (order.length === 0) return <section className="card empty">Kuyruk boş. Analiz ekranından indirme başlatın.</section>;
 
   return (
     <section className="queue-panel">
-      <div className="preview-head queue-head">
-        <b>Kuyruk ({order.length})</b>
-        <div className="queue-actions">
-          <button className="ghost" onClick={() => void handleCancelAll()}>
-            Tümünü iptal et
-          </button>
-          <button className="ghost" onClick={() => void handleClearFinished()}>
-            Bitenleri temizle
-          </button>
-          <button className="ghost" onClick={() => void handleClearAll()}>
-            Tümünü temizle
-          </button>
+      <div className="card queue-summary">
+        <div className="card-head">
+          <h3>{finished ? (failed > 0 ? `Tamamlandı · ${done} başarılı, ${failed} hatalı` : "✓ İndirme tamamlandı") : `İndiriliyor · ${current}/${total}`}</h3>
+          <div className="inline">
+            <button className="btn small" onClick={() => void DownloadService.PauseAll()}>Tümünü duraklat</button>
+            <button className="btn small" onClick={() => void DownloadService.ResumeAll()}>Tümünü sürdür</button>
+            <button className="btn small danger" onClick={() => void DownloadService.CancelAll()}>Tümünü iptal</button>
+            <button className="btn small" onClick={() => void clear("finished")}>Bitenleri temizle</button>
+            <button className="btn small" onClick={() => void clear("all")}>Tümünü temizle</button>
+          </div>
         </div>
+        <div className="meter"><span style={{ width: pct(percent) + "%" }} /></div>
+        <div className="hint">%{Math.round(pct(percent))} · {done} başarılı · {failed} hatalı · {total} toplam</div>
       </div>
 
-      {activeBatches.map((b) => {
-        const pct = b.total > 0 ? Math.round((b.current / b.total) * 100) : 0;
-        return (
-          <div key={b.batchId} className="batch-card">
-            <div className="batch-head">
-              <b>
-                {b.done
-                  ? b.failed > 0
-                    ? `Tamamlandı · ${b.completed} başarılı, ${b.failed} hatalı`
-                    : "✓ İndirme tamamlandı"
-                  : `İndiriliyor · ${b.current}/${b.total}`}
-              </b>
-              <span className="muted">%{pct}</span>
-            </div>
-            <div className="bar">
-              <div className="fill" style={{ width: Math.min(100, pct) + "%" }} />
-            </div>
-          </div>
-        );
-      })}
-
-      <div className="rows">
+      <div className="rows queue-rows">
         {order.map((id) => {
           const t = tasks[id];
           if (!t) return null;
           const active = t.state === "queued" || t.state === "downloading" || t.state === "converting";
-          const finished = t.state === "done" || t.state === "canceled" || t.state === "error";
+          const finishedTask = t.state === "done" || t.state === "error" || t.state === "canceled";
           return (
             <div key={id} className="task">
               <div className="task-line">
                 <span className="title">{t.title || id}</span>
-                <span className={"badge " + t.state}>{STATE_LABEL[t.state] ?? t.state}</span>
-                {t.state === "downloading" && (
-                  <span className="meta">
-                    {fmtSpeed(t.speedBps)}
-                    {t.etaSec > 0 ? " · " + Math.ceil(t.etaSec) + " sn" : ""}
-                  </span>
-                )}
+                <span className={stateClass(t.state)}>{STATE_LABEL[t.state] ?? t.state}</span>
+                {t.state === "downloading" && <span className="meta">{fmtSpeed(t.speedBps)} · {fmtEta(t.etaSec)}</span>}
                 <span className="task-btns">
-                  {active && (
-                    <>
-                      <button className="ghost" onClick={() => void DownloadService.Pause(id)}>
-                        Duraklat
-                      </button>
-                      <button className="ghost" onClick={() => void DownloadService.Cancel(id)}>
-                        İptal
-                      </button>
-                    </>
-                  )}
-                  {t.state === "paused" && (
-                    <>
-                      <button className="ghost" onClick={() => void DownloadService.Resume(id)}>
-                        Devam
-                      </button>
-                      <button className="ghost" onClick={() => void DownloadService.Cancel(id)}>
-                        İptal
-                      </button>
-                    </>
-                  )}
-                  {(t.state === "error" || t.state === "canceled") && (
-                    <button className="ghost" onClick={() => void DownloadService.Retry(id)}>
-                      Yeniden
-                    </button>
-                  )}
-                  {t.state === "done" && (
-                    <button className="ghost" onClick={() => void DownloadService.Reveal(t.filePath ?? "")}>
-                      Finder'da göster
-                    </button>
-                  )}
-                  {finished && (
-                    <button className="ghost" onClick={() => void handleRemove(id)}>
-                      Sil
-                    </button>
-                  )}
+                  {active && <button className="btn small" onClick={() => void DownloadService.Pause(id)}>Duraklat</button>}
+                  {t.state === "paused" && <button className="btn small" onClick={() => void DownloadService.Resume(id)}>Devam</button>}
+                  {(active || t.state === "paused") && <button className="btn small danger" onClick={() => void DownloadService.Cancel(id)}>İptal</button>}
+                  {(t.state === "error" || t.state === "canceled") && <button className="btn small" onClick={() => void DownloadService.Retry(id)}>Yeniden</button>}
+                  {t.state === "done" && <button className="btn small" onClick={() => void DownloadService.Reveal(t.filePath ?? "")}>Klasörde göster</button>}
+                  {finishedTask && <button className="btn small ghost" onClick={async () => { await DownloadService.Remove(id); removeOne(id); }}>Sil</button>}
                 </span>
               </div>
-              <div className="bar">
-                <div className="fill" style={{ width: Math.min(100, Math.max(0, t.percent)) + "%" }} />
-              </div>
+              <div className={"bar " + t.state}><div className="fill" style={{ width: pct(t.percent) + "%" }} /></div>
               {t.error && <div className="error small">{t.error}</div>}
             </div>
           );

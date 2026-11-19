@@ -24,6 +24,11 @@ export const BatchProgress = "batch:progress";
 export const DepsStatus = "deps:status";
 
 /**
+ * Name of the custom event "log:line".
+ */
+export const LogLine = "log:line";
+
+/**
  * Name of the custom event "task:progress".
  */
 export const TaskProgress = "task:progress";

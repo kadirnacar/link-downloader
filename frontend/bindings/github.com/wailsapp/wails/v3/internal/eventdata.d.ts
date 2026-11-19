@@ -15,6 +15,7 @@ declare module "@wailsio/runtime" {
             "batch:completed": services$0.BatchProgress;
             "batch:progress": services$0.BatchProgress;
             "deps:status": services$0.DepStatus;
+            "log:line": services$0.LogLine;
             "task:progress": services$0.TaskProgress;
         }
     }

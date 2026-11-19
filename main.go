@@ -1,4 +1,5 @@
 // ytdlp-studio:generated v1
+// ytdlp-studio:main v3
 package main
 
 import (
@@ -6,7 +7,6 @@ import (
 	"log"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
-
 	"ytdlp-studio/services"
 )
 
@@ -14,9 +14,11 @@ import (
 var assets embed.FS
 
 func main() {
-	deps := services.NewDepsService()
-	download := services.NewDownloadService(3)
 	settings := services.NewSettingsService()
+	appCfg := settings.LoadApp()
+
+	deps := services.NewDepsService()
+	download := services.NewDownloadService(appCfg.Workers)
 	analyze := &services.AnalyzeService{}
 
 	app := application.New(application.Options{
@@ -33,13 +35,20 @@ func main() {
 	})
 
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:  "ytdlp-studio",
-		Width:  1180,
-		Height: 760,
-		URL:    "/",
+		Title:     "ytdlp-studio",
+		Width:     1280,
+		Height:    840,
+		MinWidth:  960,
+		MinHeight: 620,
+		URL:       "/",
 	})
 
-	go deps.CheckDeps()
+	if appCfg.CheckDepsOnStart {
+		go deps.CheckDeps()
+	}
+	if appCfg.YtDlpAutoUpdate {
+		go func() { _, _ = deps.UpdateYtDlp(appCfg.YtDlpChannel) }()
+	}
 
 	if err := app.Run(); err != nil {
 		log.Fatal(err)

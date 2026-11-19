@@ -1,93 +1,301 @@
 // ytdlp-studio:generated v1
-// ytdlp-studio:output-template v2
+// ytdlp-studio:args v3
 package engine
 
 import (
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 
-	"github.com/lrstanley/go-ytdlp"
 	"ytdlp-studio/internal/model"
 )
 
 var (
-	mu        sync.RWMutex
-	ytDlpPath string
-	ffmpegDir string
+	mu     sync.RWMutex
+	ytPath string
+	ffDir  string
 )
 
-func SetPaths(ytDlp, ffDir string) {
+func SetPaths(yt, ff string) {
 	mu.Lock()
 	defer mu.Unlock()
-	ytDlpPath, ffmpegDir = ytDlp, ffDir
+	ytPath, ffDir = yt, ff
 }
 
-func NewCommand() *ytdlp.Command {
+func YtDlpPath() string {
 	mu.RLock()
-	yt, ff := ytDlpPath, ffmpegDir
-	mu.RUnlock()
-
-	c := ytdlp.New().IgnoreConfig()
-	if yt != "" {
-		c = c.SetExecutable(yt)
-	}
-	if ff != "" {
-		c = c.FFmpegLocation(ff)
-	}
-	return c
+	defer mu.RUnlock()
+	return ytPath
 }
 
-// ResolveNameTemplate, playlist_index ve playlist türevi alanları uygulama tarafında
-// gerçek değerlerle doldurur. Böylece yt-dlp'nin "NA"/"000" fallback'i devreye girmez.
-func ResolveNameTemplate(tmpl string, entry model.MediaEntry) string {
-	out := tmpl
-	if entry.Index > 0 {
-		out = strings.ReplaceAll(out, "%(playlist_index)03d", fmt.Sprintf("%03d", entry.Index))
-		out = strings.ReplaceAll(out, "%(playlist_index)s", fmt.Sprintf("%d", entry.Index))
-		out = strings.ReplaceAll(out, "%(playlist_index)d", fmt.Sprintf("%d", entry.Index))
-	} else {
-		// Tekil indirmelerde playlist_index yoksa parçayı temizle
-		out = strings.ReplaceAll(out, "%(playlist_index)03d - ", "")
-		out = strings.ReplaceAll(out, "%(playlist_index)s - ", "")
-		out = strings.ReplaceAll(out, "%(playlist_index)d - ", "")
-		out = strings.ReplaceAll(out, "%(playlist_index)03d", "")
-		out = strings.ReplaceAll(out, "%(playlist_index)s", "")
-		out = strings.ReplaceAll(out, "%(playlist_index)d", "")
+func FFmpegDir() string {
+	mu.RLock()
+	defer mu.RUnlock()
+	return ffDir
+}
+
+// PlaylistContext, adlandırma şablonundaki playlist alanlarını çözer.
+type PlaylistContext struct {
+	IsPlaylist bool
+	Title      string
+	ID         string
+}
+
+var (
+	idxRe     = regexp.MustCompile(`%\(playlist_index(?:[|&][^)]*)?\)(\d*)([sd]?)`)
+	plTitleRe = regexp.MustCompile(`%\(playlist(?:_title)?(?:[|&][^)]*)?\)(\d*)([sd]?)`)
+	plIDRe    = regexp.MustCompile(`%\(playlist_id(?:[|&][^)]*)?\)(\d*)([sd]?)`)
+	unsafeRe  = regexp.MustCompile(`[\\/:*?"<>|%]`)
+	spaceRe   = regexp.MustCompile(`\s{2,}`)
+	dashRe    = regexp.MustCompile(`(\s*-\s*){2,}`)
+	leadRe    = regexp.MustCompile(`^[\s\-_./]+`)
+)
+
+func SafeSegment(s string) string {
+	v := unsafeRe.ReplaceAllString(strings.TrimSpace(s), "")
+	v = spaceRe.ReplaceAllString(v, " ")
+	v = strings.Trim(v, " .-_")
+	if len(v) > 80 {
+		v = strings.TrimSpace(v[:80])
+	}
+	return v
+}
+
+// ResolveNameTemplate playlist alanlarını uygulama tarafında doldurur; NA/000 üretmez.
+func ResolveNameTemplate(tmpl string, e model.MediaEntry, pl PlaylistContext) string {
+	src := strings.TrimSpace(tmpl)
+	if src == "" {
+		src = "%(title)s.%(ext)s"
+	}
+	idx := e.Index
+	if idx <= 0 {
+		idx = 1
+	}
+	src = idxRe.ReplaceAllStringFunc(src, func(m string) string {
+		if !pl.IsPlaylist {
+			return ""
+		}
+		g := idxRe.FindStringSubmatch(m)
+		if g[2] == "s" || g[1] == "" {
+			return strconv.Itoa(idx)
+		}
+		return fmt.Sprintf("%"+g[1]+"d", idx)
+	})
+	src = plTitleRe.ReplaceAllStringFunc(src, func(string) string {
+		if pl.IsPlaylist {
+			return SafeSegment(pl.Title)
+		}
+		return ""
+	})
+	src = plIDRe.ReplaceAllStringFunc(src, func(string) string {
+		if pl.IsPlaylist {
+			return SafeSegment(pl.ID)
+		}
+		return ""
+	})
+	src = spaceRe.ReplaceAllString(src, " ")
+	src = dashRe.ReplaceAllString(src, " - ")
+	src = leadRe.ReplaceAllString(src, "")
+	if !strings.Contains(src, "%(ext)") {
+		src = strings.TrimSuffix(src, ".") + ".%(ext)s"
+	}
+	return src
+}
+
+func subLangs(o model.DownloadOptions) string {
+	v := strings.TrimSpace(o.SubLangs)
+	if v == "" {
+		return "en"
+	}
+	return v
+}
+
+// SplitExtraArgs basit tırnak farkındalıklı ayırıcı.
+func SplitExtraArgs(s string) []string {
+	var out []string
+	var cur strings.Builder
+	var quote rune
+	for _, r := range s {
+		switch {
+		case quote != 0:
+			if r == quote {
+				quote = 0
+			} else {
+				cur.WriteRune(r)
+			}
+		case r == '"' || r == '\'':
+			quote = r
+		case r == ' ' || r == '\t' || r == '\n':
+			if cur.Len() > 0 {
+				out = append(out, cur.String())
+				cur.Reset()
+			}
+		default:
+			cur.WriteRune(r)
+		}
+	}
+	if cur.Len() > 0 {
+		out = append(out, cur.String())
 	}
 	return out
 }
 
-// BuildCommand, her giriş için ayrı adlandırılmış komut üretir.
-func BuildCommand(o model.DownloadOptions, entry model.MediaEntry) *ytdlp.Command {
-	c := NewCommand().
-		NoPlaylist().
-		Paths("home:" + o.OutputDir).
-		Output(ResolveNameTemplate(o.NameTemplate, entry))
+// BuildArgs yt-dlp argv listesini üretir.
+func BuildArgs(o model.DownloadOptions, e model.MediaEntry, pl PlaylistContext) []string {
+	a := []string{"--ignore-config", "--no-colors", "--no-playlist"}
+	if d := FFmpegDir(); d != "" {
+		a = append(a, "--ffmpeg-location", d)
+	}
+	a = append(a,
+		"--paths", "home:"+o.OutputDir,
+		"-o", ResolveNameTemplate(o.NameTemplate, e, pl),
+		"--no-simulate",
+		"--print", "after_move:FILE|%(filepath)s",
+		"--progress",
+		"--progress-template", "download:PROG|%(progress.downloaded_bytes)s|%(progress.total_bytes)s|%(progress.total_bytes_estimate)s|%(progress.speed)s|%(progress.eta)s|%(progress.filename)s",
+		"--progress-template", "postprocess:PP|%(progress.status)s|%(progress.postprocessor)s",
+	)
 
-	if o.Mode == "audio" {
-		c = c.ExtractAudio().AudioFormat(o.AudioFormat).AudioQuality(o.AudioQuality)
-	} else {
-		f := "bv*+ba/b"
-		if o.VideoHeight > 0 {
-			f = fmt.Sprintf("bv*[height<=%d]+ba/b[height<=%d]", o.VideoHeight, o.VideoHeight)
+	switch o.Mode {
+	case "audio":
+		a = append(a, "-x", "--audio-format", o.AudioFormat, "--audio-quality", o.AudioQuality)
+		if o.KeepVideo {
+			a = append(a, "--keep-video")
 		}
-		c = c.Format(f).MergeOutputFormat(o.VideoContainer)
+	case "subtitle":
+		a = append(a, "--skip-download", "--write-subs", "--sub-langs", subLangs(o), "--sub-format", o.SubFormat)
+		if o.SubAutoGenerated {
+			a = append(a, "--write-auto-subs")
+		}
+		if o.SubFormat != "" && o.SubFormat != "best" {
+			a = append(a, "--convert-subs", o.SubFormat)
+		}
+	default:
+		f := "bv*+ba/b"
+		var filters []string
+		if o.VideoHeight > 0 {
+			filters = append(filters, fmt.Sprintf("height<=%d", o.VideoHeight))
+		}
+		if o.VideoFPS > 0 {
+			filters = append(filters, fmt.Sprintf("fps<=%d", o.VideoFPS))
+		}
+		if len(filters) > 0 {
+			f = "bv*[" + strings.Join(filters, "][") + "]+ba/b"
+		}
+		a = append(a, "-f", f, "--merge-output-format", o.VideoContainer)
+		if o.RemuxVideo != "" {
+			a = append(a, "--remux-video", o.RemuxVideo)
+		}
+		if o.AllowAudioMultistreams {
+			a = append(a, "--audio-multistreams")
+		}
+		if o.SubtitlesEnabled {
+			a = append(a, "--write-subs", "--sub-langs", subLangs(o), "--sub-format", o.SubFormat)
+			if o.SubAutoGenerated {
+				a = append(a, "--write-auto-subs")
+			}
+			if o.EmbedSubtitles {
+				a = append(a, "--embed-subs")
+			}
+		}
+	}
+
+	if o.FormatSort != "" {
+		a = append(a, "-S", o.FormatSort)
+	}
+	if o.RestrictFilenames {
+		a = append(a, "--restrict-filenames")
+	}
+	if o.NoOverwrites {
+		a = append(a, "--no-overwrites")
+	}
+	if !o.ContinueDownloads {
+		a = append(a, "--no-continue")
+	}
+	if o.NoMtime {
+		a = append(a, "--no-mtime")
 	}
 	if o.EmbedThumbnail {
-		c = c.EmbedThumbnail()
+		a = append(a, "--embed-thumbnail")
+	}
+	if o.WriteThumbnail {
+		a = append(a, "--write-thumbnail")
 	}
 	if o.EmbedMetadata {
-		c = c.EmbedMetadata()
+		a = append(a, "--embed-metadata")
+	}
+	if o.EmbedChapters {
+		a = append(a, "--embed-chapters")
+	}
+	if o.EmbedInfoJSON {
+		a = append(a, "--embed-info-json")
+	}
+	if o.WriteInfoJSON {
+		a = append(a, "--write-info-json")
 	}
 	if o.ConcurrentFragments > 1 {
-		c = c.ConcurrentFragments(o.ConcurrentFragments)
+		a = append(a, "--concurrent-fragments", strconv.Itoa(o.ConcurrentFragments))
 	}
-	if o.RateLimit != "" {
-		c = c.LimitRate(o.RateLimit)
+	if strings.TrimSpace(o.RateLimit) != "" {
+		a = append(a, "--limit-rate", strings.TrimSpace(o.RateLimit))
 	}
-	if o.CookiesBrowser != "" {
-		c = c.CookiesFromBrowser(o.CookiesBrowser)
+	a = append(a,
+		"--retries", strconv.Itoa(o.Retries),
+		"--fragment-retries", strconv.Itoa(o.FragmentRetries),
+		"--socket-timeout", strconv.Itoa(o.SocketTimeout),
+	)
+	if strings.TrimSpace(o.Proxy) != "" {
+		a = append(a, "--proxy", strings.TrimSpace(o.Proxy))
 	}
-	return c
+	if o.ForceIPv4 {
+		a = append(a, "--force-ipv4")
+	}
+	if o.ForceIPv6 {
+		a = append(a, "--force-ipv6")
+	}
+	if o.GeoBypass {
+		a = append(a, "--geo-bypass")
+	}
+	if strings.TrimSpace(o.UserAgent) != "" {
+		a = append(a, "--user-agent", strings.TrimSpace(o.UserAgent))
+	}
+	if strings.TrimSpace(o.Referer) != "" {
+		a = append(a, "--referer", strings.TrimSpace(o.Referer))
+	}
+	if strings.TrimSpace(o.CookiesBrowser) != "" {
+		a = append(a, "--cookies-from-browser", strings.TrimSpace(o.CookiesBrowser))
+	}
+	if strings.TrimSpace(o.CookiesFile) != "" {
+		a = append(a, "--cookies", strings.TrimSpace(o.CookiesFile))
+	}
+	if strings.TrimSpace(o.SponsorblockRemove) != "" {
+		a = append(a, "--sponsorblock-remove", strings.TrimSpace(o.SponsorblockRemove))
+	}
+	if strings.TrimSpace(o.SponsorblockMark) != "" {
+		a = append(a, "--sponsorblock-mark", strings.TrimSpace(o.SponsorblockMark))
+	}
+	if o.SleepInterval > 0 {
+		a = append(a, "--sleep-interval", strconv.Itoa(o.SleepInterval))
+	}
+	if o.MaxSleepInterval > 0 {
+		a = append(a, "--max-sleep-interval", strconv.Itoa(o.MaxSleepInterval))
+	}
+	if extra := SplitExtraArgs(o.ExtraArgs); len(extra) > 0 {
+		a = append(a, extra...)
+	}
+	return a
+}
+
+// AnalyzeArgs analiz için argv üretir.
+func AnalyzeArgs(target, playlistItems string, reverse bool) []string {
+	a := []string{"--flat-playlist"}
+	if strings.TrimSpace(playlistItems) != "" {
+		a = append(a, "--playlist-items", strings.TrimSpace(playlistItems))
+	}
+	if reverse {
+		a = append(a, "--playlist-reverse")
+	}
+	return a
 }

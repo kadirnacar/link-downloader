@@ -13,7 +13,11 @@ export {
 };
 
 export type {
+    BatchInfo,
     BatchProgress,
     DepStatus,
+    LogLine,
+    SubtitleInfo,
+    SubtitleTrack,
     TaskProgress
 } from "./models.js";
