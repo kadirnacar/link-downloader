@@ -16,8 +16,8 @@ export function DownloadButton() {
   async function start() {
     set({ error: undefined });
     try {
-      const ids = await DownloadService.Enqueue(entries, options);
-      addMany(ids, entries);
+       const ids = await DownloadService.Enqueue(entries, options);
+       addMany(ids ?? [], entries);
       void SettingsService.Save(options);
       set({ tab: "queue" });
     } catch (e) {

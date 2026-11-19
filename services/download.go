@@ -176,9 +176,6 @@ func (d *DownloadService) run(t downloadTask) {
 		}
 		fm.Unlock()
 		total := p.TotalBytes
-		if total == 0 {
-			total = p.TotalBytesEstimate
-		}
 		pct := 0.0
 		if total > 0 {
 			pct = float64(p.DownloadedBytes) / float64(total) * 100
@@ -188,7 +185,13 @@ func (d *DownloadService) run(t downloadTask) {
 			state = "converting"
 			pct = 100
 		}
-		d.emit(TaskProgress{TaskID: t.id, State: state, Percent: pct, Speed: p.Speed, ETA: p.ETA.Seconds()})
+		
+		eta := 0.0
+		if p.ETA != nil {
+			eta = p.ETA().Seconds()
+		}
+		
+		d.emit(TaskProgress{TaskID: t.id, State: state, Percent: pct, Speed: 0, ETA: eta})
 	})
 
 	d.emit(TaskProgress{TaskID: t.id, State: "downloading"})

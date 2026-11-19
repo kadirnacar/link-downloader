@@ -17,12 +17,12 @@ export function PasteBar() {
     try {
       const p = await AnalyzeService.ParseURL(trimmed);
       const info = await AnalyzeService.Analyze(trimmed, sc);
-      set({
-        url: trimmed,
-        parsed: p,
-        info,
-        selected: new Set(info.entries.filter((e) => e.available).map((e) => e.id)),
-      });
+       set({
+         url: trimmed,
+         parsed: p,
+         info: info ?? undefined,
+         selected: new Set((info?.entries ?? []).filter((e) => e.available).map((e) => e.id)),
+       });
     } catch (e) {
       set({ error: String(e) });
     } finally {

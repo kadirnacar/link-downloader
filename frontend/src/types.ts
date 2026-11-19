@@ -1,6 +1,6 @@
 // ytdlp-studio:generated v1
 export interface ParsedURL {
-  kind: "video" | "playlist" | "unknown";
+  kind: string;
   videoId: string;
   listId: string;
   canonicalUrl: string;
@@ -22,11 +22,11 @@ export interface MediaInfo {
   kind: string;
   id: string;
   title: string;
-  entries: MediaEntry[];
+  entries: MediaEntry[] | null;
 }
 
 export interface DownloadOptions {
-  mode: "audio" | "video";
+  mode: string;
   audioFormat: string;
   audioQuality: string;
   videoHeight: number;
@@ -42,7 +42,7 @@ export interface DownloadOptions {
 
 export interface TaskProgress {
   taskId: string;
-  state: "queued" | "downloading" | "converting" | "done" | "error" | "canceled";
+  state: string;
   percent: number;
   speedBps: number;
   etaSec: number;
@@ -55,5 +55,5 @@ export interface DepStatus {
   ffmpeg: boolean;
   ffprobe: boolean;
   jsRuntime: string;
-  missing: string[];
+  missing: string[] | null;
 }

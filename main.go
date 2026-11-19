@@ -32,7 +32,7 @@ func main() {
 		},
 	})
 
-	app.NewWebviewWindowWithOptions(application.WebviewWindowOptions{
+	app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:  "ytdlp-studio",
 		Width:  1180,
 		Height: 760,

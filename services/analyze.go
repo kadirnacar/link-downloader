@@ -74,7 +74,11 @@ func (s *AnalyzeService) Analyze(raw, scope string) (*model.MediaInfo, error) {
 		return nil, errors.New("içerik bulunamadı")
 	}
 	info := infos[0]
-	out := &model.MediaInfo{Kind: "video", ID: info.ID, Title: info.Title}
+	title := ""
+	if info.Title != nil {
+		title = *info.Title
+	}
+	out := &model.MediaInfo{Kind: "video", ID: info.ID, Title: title}
 	entries := []*ytdlp.ExtractedInfo{info}
 	if len(info.Entries) > 0 {
 		out.Kind, entries = "playlist", info.Entries
@@ -83,13 +87,30 @@ func (s *AnalyzeService) Analyze(raw, scope string) (*model.MediaInfo, error) {
 		if e == nil {
 			continue
 		}
+		webpageURL := ""
+		if e.WebpageURL != nil {
+			webpageURL = *e.WebpageURL
+		}
+		titleStr := ""
+		if e.Title != nil {
+			titleStr = *e.Title
+		}
+		duration := 0.0
+		if e.Duration != nil {
+			duration = *e.Duration
+		}
+		available := true
+		if e.Title != nil && (*e.Title == "[Private video]" || *e.Title == "[Deleted video]") {
+			available = false
+		}
+
 		me := model.MediaEntry{
 			ID:          e.ID,
-			URL:         e.WebpageURL,
-			Title:       e.Title,
-			DurationSec: e.Duration,
+			URL:         webpageURL,
+			Title:       titleStr,
+			DurationSec: duration,
 			Index:       i + 1,
-			Available:   e.Title != "[Private video]" && e.Title != "[Deleted video]",
+			Available:   available,
 		}
 		if me.URL == "" {
 			me.URL = "https://www.youtube.com/watch?v=" + e.ID
