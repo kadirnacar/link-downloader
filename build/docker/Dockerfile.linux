@@ -1,4 +1,4 @@
-# ytdlp-studio:dockerfile-linux v1
+# ytdlp-studio:dockerfile-linux v2
 # Dedicated Linux builder image for Wails v3 (Ubuntu 22.04 + WebKitGTK)
 # Used with `docker build --platform linux/amd64` on Apple Silicon.
 FROM ubuntu:22.04
@@ -21,6 +21,6 @@ ENV PATH="/usr/local/go/bin:${PATH}"
 
 # Install Node.js 20
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs && \
+    apt-get install -y nodejs
 
 WORKDIR /app
