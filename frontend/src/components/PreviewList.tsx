@@ -18,8 +18,8 @@ export function PreviewList() {
   if (!info) {
     return <section className="preview empty">URL yapıştırdığında içerik önizlemesi burada görünür.</section>;
   }
-
-  const visible = info.entries.filter((e) => e.title.toLowerCase().includes(filter.toLowerCase()));
+  const entries = info.entries ?? [];
+  const visible = entries.filter((e) => e.title.toLowerCase().includes(filter.toLowerCase()));
   const availableVisible = visible.filter((e) => e.available);
   const allSelected = availableVisible.length > 0 && availableVisible.every((e) => selected.has(e.id));
 
@@ -46,7 +46,7 @@ export function PreviewList() {
         </label>
         <input className="filter" placeholder="Ara…" value={filter} onChange={(e) => setFilter(e.target.value)} />
         <span className="count">
-          {selected.size}/{info.entries.length}
+          {selected.size}/{entries.length}
         </span>
       </div>
       <div className="rows">
