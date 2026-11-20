@@ -12,3 +12,13 @@ build/ios/xcode/overlay.json
 build/ios/xcode/gen/
 build/android/overlay.json
 build/android/gen/
+
+# ytdlp-studio additions
+/bin/
+/dist/
+/release/
+/build/_release/
+frontend/node_modules/
+frontend/dist/
+*.syso
+Assets.car

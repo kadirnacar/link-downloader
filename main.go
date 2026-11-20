@@ -35,12 +35,8 @@ func main() {
 	})
 
 	opts := application.WebviewWindowOptions{
-		Title:     "ytdlp-studio",
-		Width:     1280,
-		Height:    840,
-		MinWidth:  960,
-		MinHeight: 620,
-		URL:       "/",
+		Title: "ytdlp-studio",
+		URL:   "/",
 	}
 	tuneWindow(&opts)
 	app.Window.NewWithOptions(opts)

@@ -2,11 +2,11 @@
 // ytdlp-studio:app v3
 import { useEffect } from "react";
 import { Events } from "@wailsio/runtime";
-import { DepsService, SettingsService } from "./api";
+import { DepsService, DownloadService, SettingsService } from "./api";
 import { useStore } from "./store";
 import { useTasks } from "./taskStore";
 import { useLogs } from "./logStore";
-import type { BatchProgress, DepStatus, LogLine, TaskProgress } from "./types";
+import type { BatchProgress, DepStatus, LogLine, Tab, TaskProgress } from "./types";
 import { Sidebar } from "./components/Sidebar";
 import { PasteBar } from "./components/PasteBar";
 import { PreviewList } from "./components/PreviewList";
@@ -50,9 +50,22 @@ export default function App() {
 
   useEffect(() => {
     SettingsService.Load().then((o) => set({ options: o })).catch(() => undefined);
-    SettingsService.LoadApp().then((a) => { set({ app: a, tab: a.defaultTab as any }); setLogLimit(a.maxLogLines); }).catch(() => undefined);
+    SettingsService.LoadApp()
+      .then((a) => {
+        set({ app: a, tab: a.defaultTab as Tab });
+        setLogLimit(a.maxLogLines);
+      })
+      .catch(() => undefined);
     DepsService.CheckDeps().then((d) => set({ deps: d })).catch(() => undefined);
-  }, [set, setLogLimit]);
+
+    // Startup hydration: event'ler kaçırılmış olsa da UI backend ile eşitlenir.
+    DownloadService.Snapshot()
+      .then((tasks) => { if (tasks) tasks.forEach((t) => upsert(t)); })
+      .catch(() => undefined);
+    DownloadService.Batches()
+      .then((batches) => { if (batches) batches.forEach((b) => upsertBatch(b)); })
+      .catch(() => undefined);
+  }, [set, setLogLimit, upsert, upsertBatch]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = app.theme;
