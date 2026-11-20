@@ -4,6 +4,7 @@ package engine
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"ytdlp-studio/internal/model"
 )
@@ -80,5 +81,54 @@ func TestValidateSubtitleMode(t *testing.T) {
 	o.SubLangs = ""
 	if err := model.Validate(o); err == nil {
 		t.Fatal("boş altyazı dili reddedilmeli")
+	}
+}
+
+func TestSafeSegmentDoesNotSplitUTF8(t *testing.T) {
+	input := strings.Repeat("ç", 81)
+	got := SafeSegment(input)
+	if len([]rune(got)) != 80 {
+		t.Fatalf("80 karakter bekleniyordu, %d geldi", len([]rune(got)))
+	}
+	if !utf8.ValidString(got) {
+		t.Fatal("SafeSegment geçersiz UTF-8 üretmemeli")
+	}
+}
+
+func TestRedactArgsForLog(t *testing.T) {
+	got := redactArgsForLog([]string{
+		"--proxy", "socks5://user:secret@127.0.0.1:1080",
+		"--cookies=/private/cookies.txt",
+		"--exec", "echo sensitive-output",
+		"-f", "best",
+	})
+	want := []string{
+		"--proxy", "[REDACTED]",
+		"--cookies=[REDACTED]",
+		"--exec", "[REDACTED]",
+		"-f", "best",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("arg sayısı değişti: got=%v want=%v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("redaction hatalı: got=%v want=%v", got, want)
+		}
+	}
+}
+
+func TestNumRejectsNonFiniteValues(t *testing.T) {
+	for _, input := range []string{"NaN", "+Inf", "-Inf"} {
+		if got := num(input); got != 0 {
+			t.Fatalf("num(%q) 0 olmalıydı, %v geldi", input, got)
+		}
+	}
+}
+
+func TestAnalyzeArgsPlaylistReverse(t *testing.T) {
+	a := AnalyzeArgs("https://www.youtube.com/playlist?list=PL123", "1-5", true)
+	if !has(a, "--playlist-reverse") || val(a, "--playlist-items") != "1-5" {
+		t.Fatalf("playlist kapsamı ve ters sıralama bayrakları eksik: %v", a)
 	}
 }

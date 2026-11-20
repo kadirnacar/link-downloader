@@ -65,10 +65,6 @@ export function ResumeAll(): $CancellablePromise<void> {
     return $Call.ByID(1164478835);
 }
 
-export function Retry(taskID: string): $CancellablePromise<void> {
-    return $Call.ByID(2612158899, taskID);
-}
-
 export function Reveal(path: string): $CancellablePromise<void> {
     return $Call.ByID(4248829118, path);
 }

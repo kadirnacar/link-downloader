@@ -24,14 +24,6 @@ export function InstallDeps(): $CancellablePromise<$models.DepStatus> {
     return $Call.ByID(900204982);
 }
 
-export function ToolDirectory(): $CancellablePromise<string> {
-    return $Call.ByID(2175332222);
-}
-
 export function UpdateYtDlp(channel: string): $CancellablePromise<string> {
     return $Call.ByID(1706510323, channel);
-}
-
-export function YtDlpVersion(): $CancellablePromise<string> {
-    return $Call.ByID(2652385436);
 }

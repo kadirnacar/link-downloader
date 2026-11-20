@@ -60,7 +60,7 @@ export const useTasks = create<TaskState>((set) => ({
     set((s) => {
       const order = s.order.filter((id) => {
         const t = s.tasks[id];
-        return t && t.state !== "done" && t.state !== "canceled";
+        return t && t.state !== "done" && t.state !== "error" && t.state !== "canceled";
       });
       const tasks: Record<string, TaskItem> = {};
       order.forEach((id) => { if (s.tasks[id]) tasks[id] = s.tasks[id]; });

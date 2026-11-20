@@ -17,6 +17,12 @@ func TestParseURL(t *testing.T) {
 		{"mix", "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ", "video", "dQw4w9WgXcQ", "RDdQw4w9WgXcQ", true, true, false},
 		{"music", "https://music.youtube.com/watch?v=dQw4w9WgXcQ", "video", "dQw4w9WgXcQ", "", false, false, false},
 		{"other", "https://vimeo.com/123456", "unknown", "", "", false, false, false},
+		{"lookalike host", "https://notyoutube.com/watch?v=dQw4w9WgXcQ", "unknown", "", "", false, false, false},
+		{"host suffix attack", "https://youtube.com.evil.example/watch?v=dQw4w9WgXcQ", "unknown", "", "", false, false, false},
+		{"credentials", "https://user:pass@youtube.com/watch?v=dQw4w9WgXcQ", "unknown", "", "", false, false, true},
+		{"custom port", "https://youtube.com:8443/watch?v=dQw4w9WgXcQ", "unknown", "", "", false, false, true},
+		{"invalid video id", "https://youtube.com/watch?v=too-short", "unknown", "", "", false, false, false},
+		{"non https", "http://youtube.com/watch?v=dQw4w9WgXcQ", "unknown", "", "", false, false, true},
 		{"invalid", "bu bir url değil", "unknown", "", "", false, false, true},
 	}
 	for _, c := range cases {

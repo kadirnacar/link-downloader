@@ -4,6 +4,7 @@ import { DepsService, SettingsService } from "../api";
 import { useStore } from "../store";
 import { SECTIONS } from "../settings/catalog";
 import { Field } from "../components/Field";
+import type { AppSettings, DownloadOptions } from "../types";
 
 export function SettingsPage() {
   const section = useStore((s) => s.settingsSection);
@@ -28,10 +29,14 @@ export function SettingsPage() {
     } catch (e) { setMsg(String(e)); }
   }
   async function reset() {
-    const o = await SettingsService.Reset();
-    const a = await SettingsService.ResetApp();
-    set({ options: o, app: a });
-    setMsg("Varsayılanlara dönüldü.");
+    try {
+      const o = await SettingsService.Reset();
+      const a = await SettingsService.ResetApp();
+      set({ options: o, app: a });
+      setMsg("Varsayılanlar kaydedildi.");
+    } catch (e) {
+      setMsg(`Ayarlar sıfırlanamadı: ${String(e)}`);
+    }
   }
   async function showPreview() {
     setPreview(await SettingsService.PreviewArgs(options));
@@ -45,7 +50,7 @@ export function SettingsPage() {
   async function ensure() {
     set({ installing: true });
     try {
-      const d = await (DepsService as any).EnsureDeps();
+      const d = await DepsService.EnsureDeps();
       set({ deps: d });
       setMsg("Bileşenler kuruldu ve doğrulandı.");
     } catch (e) { setMsg(String(e)); }
@@ -53,14 +58,26 @@ export function SettingsPage() {
   }
 
   async function update() {
+    set({ installing: true });
     setMsg("yt-dlp güncelleniyor…");
-    try { setMsg((await DepsService.UpdateYtDlp(app.ytDlpChannel)).trim() || "Güncel."); }
-    catch (e) { setMsg(String(e)); }
+    try {
+      setMsg((await DepsService.UpdateYtDlp(app.ytDlpChannel)).trim() || "Güncel.");
+      set({ deps: await DepsService.CheckDeps() });
+    } catch (e) { setMsg(String(e)); }
+    finally { set({ installing: false }); }
   }
 
   const active = SECTIONS.find((s) => s.id === section) ?? SECTIONS[0];
-  const store: any = active.target === "app" ? app : options;
-  const patch = active.target === "app" ? patchApp : patchOptions;
+  const store = active.target === "app"
+    ? app as unknown as Record<string, unknown>
+    : options as unknown as Record<string, unknown>;
+  function updateField(key: string, value: string | number | boolean) {
+    if (active.target === "app") {
+      patchApp({ [key]: value } as Partial<AppSettings>);
+    } else {
+      patchOptions({ [key]: value } as Partial<DownloadOptions>);
+    }
+  }
 
   return (
     <div className="settings">
@@ -96,10 +113,10 @@ export function SettingsPage() {
               <div className="status-row"><span>ffmpeg</span><span className={deps?.ffmpeg ? "tag good" : "tag bad"}>{deps?.ffmpeg ? "Kurulu" : "Eksik"}</span></div>
               <div className="status-row"><span>ffprobe</span><span className={deps?.ffprobe ? "tag good" : "tag bad"}>{deps?.ffprobe ? "Kurulu" : "Eksik"}</span></div>
               <div className="status-row"><span>JS runtime</span><strong>{deps?.jsRuntime || "—"}</strong></div>
-              <div className="status-row"><span>ffmpeg</span><code>{(deps as any)?.ffmpegPath || "—"}</code></div>
-              <div className="status-row"><span>ffprobe</span><code>{(deps as any)?.ffprobePath || "—"}</code></div>
-              <div className="status-row"><span>Araç dizini</span><code>{(deps as any)?.toolDir || "—"}</code></div>
-              {((deps as any)?.notes ?? []).map((n: string, i: number) => (
+              <div className="status-row"><span>ffmpeg</span><code>{deps?.ffmpegPath || "—"}</code></div>
+              <div className="status-row"><span>ffprobe</span><code>{deps?.ffprobePath || "—"}</code></div>
+              <div className="status-row"><span>Araç dizini</span><code>{deps?.toolDir || "—"}</code></div>
+              {(deps?.notes ?? []).map((n, i) => (
                 <div key={i} className="hint">{n}</div>
               ))}
               <div className="field">
@@ -117,16 +134,21 @@ export function SettingsPage() {
                 <span>Açılışta bileşenleri denetle</span>
               </label>
               <div className="inline">
-                <button className="btn" onClick={() => void DepsService.CheckDeps().then((d) => set({ deps: d }))}>Yeniden denetle</button>
-                <button className="btn primary" disabled={installing} onClick={() => void install()}>{installing ? "Kuruluyor…" : "Eksikleri kur"}</button>
+                <button className="btn" disabled={installing} onClick={() => void DepsService.CheckDeps().then((d) => set({ deps: d })).catch((e) => setMsg(String(e)))}>Yeniden denetle</button>
+                <button className="btn primary" disabled={installing} onClick={() => void install()}>{installing ? "İşleniyor…" : "Eksikleri kur"}</button>
                 <button className="btn" disabled={installing} onClick={() => void ensure()}>Kur ve doğrula</button>
-                <button className="btn" onClick={() => void update()}>yt-dlp güncelle</button>
+                <button className="btn" disabled={installing} onClick={() => void update()}>yt-dlp güncelle</button>
               </div>
             </div>
           ) : (
             <div className="fields-grid">
               {active.fields.map((f) => (
-                <Field key={f.k} def={f} value={store[f.k]} onChange={(v) => patch({ [f.k]: v } as any)} />
+                <Field
+                  key={f.k}
+                  def={f}
+                  value={store[f.k] as string | number | boolean | undefined}
+                  onChange={(value) => updateField(f.k, value)}
+                />
               ))}
             </div>
           )}

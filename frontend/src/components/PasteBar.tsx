@@ -18,7 +18,8 @@ export function PasteBar() {
     set({ analyzing: true, error: undefined, info: undefined, subs: undefined });
     try {
       const p = await AnalyzeService.ParseURL(trimmed);
-      const info = await AnalyzeService.Analyze(trimmed, sc, options.playlistItems);
+      const analyzeScope = options.playlistReverse ? `${sc}-reverse` : sc;
+      const info = await AnalyzeService.Analyze(trimmed, analyzeScope, options.playlistItems);
       set({
         url: trimmed, parsed: p, info: info ?? undefined,
         selected: new Set((info?.entries ?? []).filter((e) => e.available).map((e) => e.id)),
@@ -51,7 +52,7 @@ export function PasteBar() {
           {analyzing ? "Analiz ediliyor…" : "Analiz Et"}
         </button>
         {parsed?.ambiguous && (
-          <select className="pastebar-scope" value={scope}
+          <select className="pastebar-scope" value={scope} disabled={analyzing}
             onChange={(e) => {
               const sc = e.target.value as "video" | "playlist";
               set({ scope: sc });

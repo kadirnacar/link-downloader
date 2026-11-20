@@ -53,7 +53,6 @@ export default function App() {
     SettingsService.LoadApp()
       .then((a) => {
         set({ app: a, tab: a.defaultTab as Tab });
-        setLogLimit(a.maxLogLines);
       })
       .catch(() => undefined);
     DepsService.CheckDeps().then((d) => set({ deps: d })).catch(() => undefined);
@@ -65,7 +64,11 @@ export default function App() {
     DownloadService.Batches()
       .then((batches) => { if (batches) batches.forEach((b) => upsertBatch(b)); })
       .catch(() => undefined);
-  }, [set, setLogLimit, upsert, upsertBatch]);
+  }, [set, upsert, upsertBatch]);
+
+  useEffect(() => {
+    setLogLimit(app.maxLogLines);
+  }, [app.maxLogLines, setLogLimit]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = app.theme;
@@ -116,7 +119,7 @@ export default function App() {
               <div className="analyze-grid">
                 <div className="analyze-left">
                   <PreviewList />
-                  {mode !== "audio" && <SubtitlePicker />}
+                  {mode !== "audio" && info?.kind === "video" && <SubtitlePicker />}
                 </div>
                 <OptionsPanel />
               </div>

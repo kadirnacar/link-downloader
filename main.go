@@ -41,17 +41,19 @@ func main() {
 	tuneWindow(&opts)
 	app.Window.NewWithOptions(opts)
 
-	if appCfg.CheckDepsOnStart {
+	if appCfg.CheckDepsOnStart || appCfg.YtDlpAutoUpdate {
 		go func() {
-			if _, err := deps.EnsureDeps(); err != nil {
-				log.Printf("dependency check failed: %v", err)
+			if appCfg.CheckDepsOnStart {
+				if _, err := deps.EnsureDeps(); err != nil {
+					log.Printf("dependency check failed: %v", err)
+				}
+			} else {
+				deps.CheckDeps()
 			}
-		}()
-	}
-	if appCfg.YtDlpAutoUpdate {
-		go func() {
-			if _, err := deps.UpdateYtDlp(appCfg.YtDlpChannel); err != nil {
-				log.Printf("yt-dlp auto-update failed (channel=%s): %v", appCfg.YtDlpChannel, err)
+			if appCfg.YtDlpAutoUpdate {
+				if _, err := deps.UpdateYtDlp(appCfg.YtDlpChannel); err != nil {
+					log.Printf("yt-dlp auto-update failed (channel=%s): %v", appCfg.YtDlpChannel, err)
+				}
 			}
 		}()
 	}

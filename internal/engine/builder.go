@@ -57,8 +57,8 @@ func SafeSegment(s string) string {
 	v := unsafeRe.ReplaceAllString(strings.TrimSpace(s), "")
 	v = spaceRe.ReplaceAllString(v, " ")
 	v = strings.Trim(v, " .-_")
-	if len(v) > 80 {
-		v = strings.TrimSpace(v[:80])
+	if runes := []rune(v); len(runes) > 80 {
+		v = strings.TrimSpace(string(runes[:80]))
 	}
 	return v
 }

@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/lrstanley/go-ytdlp"
@@ -32,7 +33,9 @@ type DepStatus struct {
 	Notes       []string `json:"notes"`
 }
 
-type DepsService struct{}
+type DepsService struct {
+	mu sync.Mutex
+}
 
 func NewDepsService() *DepsService { return &DepsService{} }
 
@@ -49,8 +52,13 @@ func depsToolDir() string {
 		return ""
 	}
 	dir := filepath.Join(base, "ytdlp-studio", "bin")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return ""
+	}
+	if runtime.GOOS != "windows" {
+		if err := os.Chmod(dir, 0o700); err != nil {
+			return ""
+		}
 	}
 	return dir
 }
@@ -216,6 +224,12 @@ func manualHint(component string) string {
 }
 
 func (s *DepsService) CheckDeps() DepStatus {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.checkDeps()
+}
+
+func (s *DepsService) checkDeps() DepStatus {
 	yt, ff, fp := look("yt-dlp"), look("ffmpeg"), look("ffprobe")
 	js := ""
 	if look("deno") != "" {
@@ -272,9 +286,15 @@ func safeInstall(fn func()) (err error) {
 }
 
 func (s *DepsService) InstallDeps() (DepStatus, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.installDeps()
+}
+
+func (s *DepsService) installDeps() (DepStatus, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Minute)
 	defer cancel()
-	st := s.CheckDeps()
+	st := s.checkDeps()
 
 	if !st.YtDlp {
 		if err := safeInstall(func() { ytdlp.MustInstall(ctx, nil) }); err != nil {
@@ -297,7 +317,7 @@ func (s *DepsService) InstallDeps() (DepStatus, error) {
 		}
 	}
 
-	after := s.CheckDeps()
+	after := s.checkDeps()
 	after.Notes = append(after.Notes, st.Notes...)
 	hard := []string{}
 	for _, m := range after.Missing {
@@ -313,14 +333,21 @@ func (s *DepsService) InstallDeps() (DepStatus, error) {
 
 // EnsureDeps eksikleri indirir, kurar ve binary'leri gerçekten çalıştırarak doğrular.
 func (s *DepsService) EnsureDeps() (DepStatus, error) {
-	st := s.CheckDeps()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	st := s.checkDeps()
 	var err error
+	var verificationErrors []string
 	if len(st.Missing) > 0 {
-		st, err = s.InstallDeps()
+		st, err = s.installDeps()
+	}
+	if st.YtDlpPath != "" && st.YtDlpVer == "" {
+		verificationErrors = append(verificationErrors, "yt-dlp")
 	}
 	if st.FFmpegPath != "" {
 		if v, e := probeVersion(st.FFmpegPath, "-version", 25*time.Second); e != nil {
 			st.Notes = append(st.Notes, "ffmpeg doğrulanamadı: "+e.Error())
+			verificationErrors = append(verificationErrors, "ffmpeg")
 		} else {
 			st.Notes = append(st.Notes, "ffmpeg OK · "+v)
 		}
@@ -328,6 +355,7 @@ func (s *DepsService) EnsureDeps() (DepStatus, error) {
 	if st.FFprobePath != "" {
 		if v, e := probeVersion(st.FFprobePath, "-version", 25*time.Second); e != nil {
 			st.Notes = append(st.Notes, "ffprobe doğrulanamadı: "+e.Error())
+			verificationErrors = append(verificationErrors, "ffprobe")
 		} else {
 			st.Notes = append(st.Notes, "ffprobe OK · "+v)
 		}
@@ -338,10 +366,15 @@ func (s *DepsService) EnsureDeps() (DepStatus, error) {
 	if app := application.Get(); app != nil {
 		app.Event.Emit("deps:status", st)
 	}
+	if err == nil && len(verificationErrors) > 0 {
+		err = fmt.Errorf("bileşen doğrulaması başarısız: %s", strings.Join(verificationErrors, ", "))
+	}
 	return st, err
 }
 
 func (s *DepsService) UpdateYtDlp(channel string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	yt := look("yt-dlp")
 	if yt == "" {
 		return "", fmt.Errorf("yt-dlp bulunamadı; önce bileşenleri kurun")
@@ -356,12 +389,6 @@ func (s *DepsService) UpdateYtDlp(channel string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, yt, args...).CombinedOutput()
-	s.CheckDeps()
+	s.checkDeps()
 	return string(out), err
 }
-
-func (s *DepsService) YtDlpVersion() (string, error) {
-	return probeVersion(look("yt-dlp"), "--version", 25*time.Second)
-}
-
-func (s *DepsService) ToolDirectory() string { return depsToolDir() }

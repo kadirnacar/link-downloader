@@ -8,14 +8,12 @@ export interface AppSettings {
     "workers": number;
     "theme": string;
     "accent": string;
-    "language": string;
     "notifications": boolean;
     "confirmClearQueue": boolean;
     "clipboardAutoAnalyze": boolean;
     "checkDepsOnStart": boolean;
     "ytDlpAutoUpdate": boolean;
     "ytDlpChannel": string;
-    "logLevel": string;
     "maxLogLines": number;
     "defaultTab": string;
     "sidebarCollapsed": boolean;

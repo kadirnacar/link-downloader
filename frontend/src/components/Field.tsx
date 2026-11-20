@@ -2,10 +2,12 @@
 import type { FieldDef } from "../settings/catalog";
 import { DownloadService } from "../api";
 
+type FieldValue = string | number | boolean;
+
 interface Props {
   def: FieldDef;
-  value: any;
-  onChange: (v: any) => void;
+  value: FieldValue | undefined;
+  onChange: (v: FieldValue) => void;
 }
 
 export function Field({ def, value, onChange }: Props) {

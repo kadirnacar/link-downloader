@@ -19,10 +19,10 @@ export const DEFAULT_OPTIONS: DownloadOptions = {
 };
 
 export const DEFAULT_APP: AppSettings = {
-  workers: 3, theme: "dark", accent: "blue", language: "tr",
+  workers: 3, theme: "dark", accent: "blue",
   notifications: true, confirmClearQueue: true, clipboardAutoAnalyze: false,
   checkDepsOnStart: true, ytDlpAutoUpdate: false, ytDlpChannel: "stable",
-  logLevel: "info", maxLogLines: 2000, defaultTab: "analyze", sidebarCollapsed: false,
+  maxLogLines: 2000, defaultTab: "analyze", sidebarCollapsed: false,
 };
 
 interface AppState {

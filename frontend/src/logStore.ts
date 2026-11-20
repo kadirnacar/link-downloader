@@ -16,6 +16,6 @@ export const useLogs = create<LogState>((set) => ({
     const lines = [...s.lines, l];
     return { lines: lines.length > s.limit ? lines.slice(lines.length - s.limit) : lines };
   }),
-  setLimit: (n) => set({ limit: n }),
+  setLimit: (n) => set((s) => ({ limit: n, lines: s.lines.slice(-n) })),
   clear: () => set({ lines: [] }),
 }));

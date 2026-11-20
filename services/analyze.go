@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -47,26 +48,51 @@ type rawInfo struct {
 	Availability  string `json:"availability"`
 }
 
+var (
+	youtubeVideoIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{11}$`)
+	youtubeListIDPattern  = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+)
+
 func (s *AnalyzeService) ParseURL(raw string) (model.ParsedURL, error) {
 	p := model.ParsedURL{Kind: "unknown", CanonicalURL: strings.TrimSpace(raw)}
 	u, err := url.Parse(p.CanonicalURL)
-	if err != nil || u.Scheme == "" || u.Host == "" {
+	if err != nil || !u.IsAbs() || u.Host == "" {
 		return p, fmt.Errorf("geçersiz URL: %q", raw)
 	}
-	host := strings.ToLower(u.Host)
+	if !strings.EqualFold(u.Scheme, "https") || u.User != nil {
+		return p, errors.New("YouTube bağlantıları HTTPS olmalı ve kullanıcı bilgisi içermemeli")
+	}
+	if port := u.Port(); port != "" && port != "443" {
+		return p, errors.New("YouTube bağlantısında özel port kullanılamaz")
+	}
+
+	host := strings.ToLower(u.Hostname())
 	host = strings.TrimPrefix(host, "www.")
 	host = strings.TrimPrefix(host, "m.")
+	isYouTube := host == "youtube.com" || host == "youtube-nocookie.com" ||
+		host == "music.youtube.com" || host == "youtu.be"
+	if !isYouTube {
+		return p, nil
+	}
+
 	q := u.Query()
 	p.VideoID, p.ListID = q.Get("v"), q.Get("list")
-
-	switch {
-	case host == "youtu.be":
-		p.VideoID = strings.Trim(u.Path, "/")
-	case strings.HasSuffix(host, "youtube.com") || strings.HasSuffix(host, "youtube-nocookie.com"):
+	if host == "youtu.be" {
+		parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+		if len(parts) > 0 {
+			p.VideoID = parts[0]
+		}
+	} else {
 		parts := strings.Split(strings.Trim(u.Path, "/"), "/")
 		if len(parts) >= 2 && (parts[0] == "shorts" || parts[0] == "live" || parts[0] == "embed") {
 			p.VideoID = parts[1]
 		}
+	}
+	if !youtubeVideoIDPattern.MatchString(p.VideoID) {
+		p.VideoID = ""
+	}
+	if !youtubeListIDPattern.MatchString(p.ListID) {
+		p.ListID = ""
 	}
 	switch {
 	case p.VideoID != "" && p.ListID != "":
@@ -126,6 +152,13 @@ func (s *AnalyzeService) Analyze(raw, scope, playlistItems string) (*model.Media
 	if err != nil {
 		return nil, err
 	}
+	if p.Kind == "unknown" {
+		return nil, errors.New("desteklenmeyen bağlantı: YouTube video veya playlist URL'si gerekli")
+	}
+	reverse := strings.HasSuffix(scope, "-reverse")
+	if reverse {
+		scope = strings.TrimSuffix(scope, "-reverse")
+	}
 	target := p.CanonicalURL
 	wantPlaylist := false
 	switch {
@@ -139,7 +172,7 @@ func (s *AnalyzeService) Analyze(raw, scope, playlistItems string) (*model.Media
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	data, err := engine.ExtractInfo(ctx, target, engine.AnalyzeArgs(target, playlistItems, false)...)
+	data, err := engine.ExtractInfo(ctx, target, engine.AnalyzeArgs(target, playlistItems, reverse)...)
 	if err != nil {
 		return nil, fmt.Errorf("içerik analizi başarısız: %w", err)
 	}
@@ -249,10 +282,10 @@ func (s *AnalyzeService) Subtitles(raw string) (*SubtitleInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	target := p.CanonicalURL
-	if p.VideoID != "" {
-		target = "https://www.youtube.com/watch?v=" + p.VideoID
+	if p.VideoID == "" {
+		return nil, errors.New("desteklenmeyen bağlantı: YouTube video URL'si gerekli")
 	}
+	target := "https://www.youtube.com/watch?v=" + p.VideoID
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 

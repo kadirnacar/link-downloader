@@ -22,13 +22,11 @@ export const SECTIONS: SectionDef[] = [
       { k: "defaultTab", t: "select", label: "Başlangıç ekranı", choices: sel(["analyze", "queue", "settings", "logs", "about"], ["Analiz", "Kuyruk", "Ayarlar", "Günlük", "Hakkında"]) },
       { k: "theme", t: "select", label: "Tema", choices: sel(["dark", "light"], ["Koyu", "Açık"]) },
       { k: "accent", t: "select", label: "Vurgu rengi", choices: sel(["blue", "cyan", "green", "amber", "violet"], ["Mavi", "Turkuaz", "Yeşil", "Kehribar", "Menekşe"]) },
-      { k: "language", t: "select", label: "Dil", choices: sel(["tr", "en"], ["Türkçe", "English"]) },
       { k: "notifications", t: "bool", label: "Bitiş bildirimleri" },
       { k: "confirmClearQueue", t: "bool", label: "Kuyruk temizlemede onay iste" },
       { k: "clipboardAutoAnalyze", t: "bool", label: "Yapıştırınca otomatik analiz" },
       { k: "sidebarCollapsed", t: "bool", label: "Kenar çubuğu dar" },
       { k: "maxLogLines", t: "num", label: "Günlük satır limiti", min: 100, max: 20000 },
-      { k: "logLevel", t: "select", label: "Günlük seviyesi", choices: sel(["info", "debug"]) },
     ],
   },
   {
@@ -111,7 +109,7 @@ export const SECTIONS: SectionDef[] = [
   },
   {
     id: "advanced", title: "Gelişmiş", icon: "⌘", target: "options", fields: [
-      { k: "extraArgs", t: "text", label: "Ek yt-dlp argümanları", ph: "--write-comments --limit-rate 2M", help: "Tırnak desteklenir. Dikkatli kullanın." },
+      { k: "extraArgs", t: "text", label: "Ek yt-dlp argümanları", ph: "--write-comments --limit-rate 2M", help: "Tırnak desteklenir. --exec gibi seçenekler yerel komut çalıştırabilir; yalnızca güvendiğiniz argümanları girin." },
     ],
   },
 ];

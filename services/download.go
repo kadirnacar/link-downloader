@@ -60,9 +60,15 @@ type downloadTask struct {
 	batchID    string
 	batchTitle string
 	title      string
+	attempt    uint64
 	entry      model.MediaEntry
 	opts       model.DownloadOptions
 	pl         engine.PlaylistContext
+}
+
+type taskRunLock struct {
+	mu   sync.Mutex
+	refs int
 }
 
 type batchState struct {
@@ -106,38 +112,47 @@ func (b *batchState) snapshot(id string) BatchProgress {
 }
 
 type DownloadService struct {
-	mu        sync.Mutex
-	queue     chan downloadTask
-	cancels   map[string]context.CancelFunc
-	canceled  map[string]bool
-	paused    map[string]bool
-	tasks     map[string]downloadTask
-	states    map[string]string
-	percents  map[string]float64
-	files     map[string]string
-	errors    map[string]string
-	batches   map[string]*batchState
-	taskBatch map[string]string
-	seq       int
-	batchSeq  int
+	mu             sync.Mutex
+	queue          chan downloadTask
+	runLocks       map[string]*taskRunLock
+	cancels        map[string]context.CancelFunc
+	cancelAttempts map[string]uint64
+	attempts       map[string]uint64
+	canceled       map[string]bool
+	paused         map[string]bool
+	tasks          map[string]downloadTask
+	states         map[string]string
+	percents       map[string]float64
+	files          map[string]string
+	errors         map[string]string
+	batches        map[string]*batchState
+	taskBatch      map[string]string
+	seq            int
+	batchSeq       int
 }
 
 func NewDownloadService(workers int) *DownloadService {
 	if workers < 1 {
 		workers = 1
 	}
+	if workers > 8 {
+		workers = 8
+	}
 	d := &DownloadService{
-		queue:     make(chan downloadTask, 8192),
-		cancels:   map[string]context.CancelFunc{},
-		canceled:  map[string]bool{},
-		paused:    map[string]bool{},
-		tasks:     map[string]downloadTask{},
-		states:    map[string]string{},
-		percents:  map[string]float64{},
-		files:     map[string]string{},
-		errors:    map[string]string{},
-		batches:   map[string]*batchState{},
-		taskBatch: map[string]string{},
+		queue:          make(chan downloadTask, 8192),
+		runLocks:       map[string]*taskRunLock{},
+		cancels:        map[string]context.CancelFunc{},
+		cancelAttempts: map[string]uint64{},
+		attempts:       map[string]uint64{},
+		canceled:       map[string]bool{},
+		paused:         map[string]bool{},
+		tasks:          map[string]downloadTask{},
+		states:         map[string]string{},
+		percents:       map[string]float64{},
+		files:          map[string]string{},
+		errors:         map[string]string{},
+		batches:        map[string]*batchState{},
+		taskBatch:      map[string]string{},
 	}
 	for i := 0; i < workers; i++ {
 		go d.worker()
@@ -178,6 +193,20 @@ func (d *DownloadService) Enqueue(entries []model.MediaEntry, opts model.Downloa
 	if len(entries) == 0 {
 		return nil, errors.New("seçili öğe yok")
 	}
+	for i, entry := range entries {
+		if !entry.Available {
+			return nil, fmt.Errorf("%d. öğe indirilebilir durumda değil", i+1)
+		}
+		u := taskURL(entry)
+		if u == "" {
+			return nil, fmt.Errorf("%d. öğenin indirme URL'si yok", i+1)
+		}
+		parsed, parseErr := (&AnalyzeService{}).ParseURL(u)
+		entryID := strings.TrimSpace(entry.ID)
+		if parseErr != nil || parsed.VideoID == "" || entryID == "" || entryID != parsed.VideoID {
+			return nil, fmt.Errorf("%d. öğe desteklenmeyen bir YouTube video URL'si içeriyor", i+1)
+		}
+	}
 	kind := batch.Kind
 	if kind != "playlist" {
 		kind = "file"
@@ -206,14 +235,16 @@ func (d *DownloadService) Enqueue(entries []model.MediaEntry, opts model.Downloa
 	}
 	d.batches[bid] = b
 	for i, e := range entries {
+		e.ID = strings.TrimSpace(e.ID)
 		if e.Index <= 0 {
 			e.Index = i + 1
 		}
 		e.URL = taskURL(e)
 		d.seq++
 		id := fmt.Sprintf("%s-%d", e.ID, d.seq)
-		t := downloadTask{id: id, batchID: bid, title: e.Title, entry: e, opts: opts, pl: pl}
+		t := downloadTask{id: id, batchID: bid, batchTitle: title, title: e.Title, attempt: 1, entry: e, opts: opts, pl: pl}
 		d.tasks[id] = t
+		d.attempts[id] = t.attempt
 		d.states[id] = "queued"
 		d.taskBatch[id] = bid
 		d.percents[id] = 0
@@ -227,7 +258,7 @@ func (d *DownloadService) Enqueue(entries []model.MediaEntry, opts model.Downloa
 
 	d.emitBatch(snap)
 	for _, t := range staged {
-		d.emit(TaskProgress{TaskID: t.id, State: "queued", BatchID: bid, BatchTitle: title})
+		d.emitAttempt(TaskProgress{TaskID: t.id, State: "queued", BatchID: bid, BatchTitle: title}, t.attempt)
 		d.queue <- t
 	}
 	return ids, nil
@@ -246,7 +277,7 @@ func (d *DownloadService) Snapshot() []TaskProgress {
 		out = append(out, TaskProgress{
 			TaskID: id, State: st, Percent: d.percents[id],
 			Error: d.errors[id], FilePath: d.files[id],
-			BatchID: t.batchID, BatchTitle: t.title,
+			BatchID: t.batchID, BatchTitle: t.batchTitle,
 		})
 	}
 	return out
@@ -296,14 +327,16 @@ func (d *DownloadService) Cancel(taskID string) {
 	d.canceled[taskID] = true
 	delete(d.paused, taskID)
 	cancel := d.cancels[taskID]
+	attempt := d.attempts[taskID]
 	bid := d.taskBatch[taskID]
 	d.mu.Unlock()
 
 	if cancel != nil {
 		cancel()
 	}
-	d.finish(taskID, "canceled", "", "")
-	d.syncBatch(bid)
+	if d.finish(taskID, attempt, "canceled", "", "") {
+		d.syncBatch(bid)
+	}
 }
 
 func (d *DownloadService) Pause(taskID string) {
@@ -320,14 +353,16 @@ func (d *DownloadService) Pause(taskID string) {
 	d.paused[taskID] = true
 	d.canceled[taskID] = true
 	cancel := d.cancels[taskID]
+	attempt := d.attempts[taskID]
 	bid := d.taskBatch[taskID]
 	d.mu.Unlock()
 
 	if cancel != nil {
 		cancel()
 	}
-	d.finish(taskID, "paused", "", "")
-	d.syncBatch(bid)
+	if d.finish(taskID, attempt, "paused", "", "") {
+		d.syncBatch(bid)
+	}
 }
 
 func (d *DownloadService) Resume(taskID string) error {
@@ -337,6 +372,17 @@ func (d *DownloadService) Resume(taskID string) error {
 		d.mu.Unlock()
 		return fmt.Errorf("görev bulunamadı: %s", taskID)
 	}
+	switch d.states[taskID] {
+	case "paused", "error", "canceled":
+	default:
+		state := d.states[taskID]
+		d.mu.Unlock()
+		return fmt.Errorf("%s durumundaki görev yeniden başlatılamaz", state)
+	}
+	t.attempt = d.attempts[taskID] + 1
+	d.attempts[taskID] = t.attempt
+	d.tasks[taskID] = t
+	d.states[taskID] = "queued"
 	delete(d.canceled, taskID)
 	delete(d.paused, taskID)
 	delete(d.errors, taskID)
@@ -351,15 +397,13 @@ func (d *DownloadService) Resume(taskID string) error {
 	}
 	d.mu.Unlock()
 
-	d.emit(TaskProgress{TaskID: taskID, State: "queued", BatchID: bid, BatchTitle: t.title})
+	d.emitAttempt(TaskProgress{TaskID: taskID, State: "queued", BatchID: bid, BatchTitle: t.batchTitle}, t.attempt)
 	d.queue <- t
 	if snap != nil {
 		d.emitBatch(*snap)
 	}
 	return nil
 }
-
-func (d *DownloadService) Retry(taskID string) error { return d.Resume(taskID) }
 
 func (d *DownloadService) Remove(taskID string) {
 	d.mu.Lock()
@@ -374,6 +418,8 @@ func (d *DownloadService) Remove(taskID string) {
 	delete(d.files, taskID)
 	delete(d.errors, taskID)
 	delete(d.taskBatch, taskID)
+	delete(d.attempts, taskID)
+	delete(d.cancelAttempts, taskID)
 	var snap *BatchProgress
 	if b := d.batches[bid]; b != nil {
 		var kept []string
@@ -436,6 +482,8 @@ func (d *DownloadService) ClearFinished() {
 			delete(d.files, id)
 			delete(d.errors, id)
 			delete(d.taskBatch, id)
+			delete(d.attempts, id)
+			delete(d.cancelAttempts, id)
 		}
 	}
 	var snaps []BatchProgress
@@ -465,6 +513,10 @@ func (d *DownloadService) ClearAll() {
 		}
 	}
 	d.tasks = map[string]downloadTask{}
+	d.attempts = map[string]uint64{}
+	d.cancelAttempts = map[string]uint64{}
+	d.cancels = map[string]context.CancelFunc{}
+	d.canceled = map[string]bool{}
 	d.states = map[string]string{}
 	d.percents = map[string]float64{}
 	d.files = map[string]string{}
@@ -530,15 +582,52 @@ func (d *DownloadService) Reveal(path string) error {
 	}
 }
 
+func (d *DownloadService) isRunnable(t downloadTask) (downloadTask, bool) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	stored, exists := d.tasks[t.id]
+	if !exists || d.attempts[t.id] != t.attempt || d.states[t.id] != "queued" || d.canceled[t.id] {
+		return downloadTask{}, false
+	}
+	return stored, true
+}
+
+func (d *DownloadService) acquireRunLock(taskID string) *taskRunLock {
+	d.mu.Lock()
+	lock := d.runLocks[taskID]
+	if lock == nil {
+		lock = &taskRunLock{}
+		d.runLocks[taskID] = lock
+	}
+	lock.refs++
+	d.mu.Unlock()
+	lock.mu.Lock()
+	return lock
+}
+
+func (d *DownloadService) releaseRunLock(taskID string, lock *taskRunLock) {
+	lock.mu.Unlock()
+	d.mu.Lock()
+	lock.refs--
+	if lock.refs == 0 && d.runLocks[taskID] == lock {
+		delete(d.runLocks, taskID)
+	}
+	d.mu.Unlock()
+}
+
 func (d *DownloadService) worker() {
 	for t := range d.queue {
-		d.mu.Lock()
-		skip := d.canceled[t.id]
-		d.mu.Unlock()
-		if skip {
-			continue
-		}
-		d.run(t)
+		d.runQueued(t)
+	}
+}
+
+func (d *DownloadService) runQueued(t downloadTask) {
+	lock := d.acquireRunLock(t.id)
+	defer d.releaseRunLock(t.id, lock)
+
+	stored, ok := d.isRunnable(t)
+	if ok {
+		d.run(stored)
 	}
 }
 
@@ -578,12 +667,21 @@ func (d *DownloadService) finalPath(t downloadTask, lastFile string) string {
 func (d *DownloadService) run(t downloadTask) {
 	ctx, cancel := context.WithCancel(context.Background())
 	d.mu.Lock()
+	if _, exists := d.tasks[t.id]; !exists || d.attempts[t.id] != t.attempt || d.states[t.id] != "queued" || d.canceled[t.id] {
+		d.mu.Unlock()
+		cancel()
+		return
+	}
 	d.cancels[t.id] = cancel
+	d.cancelAttempts[t.id] = t.attempt
 	d.mu.Unlock()
 	defer func() {
 		cancel()
 		d.mu.Lock()
-		delete(d.cancels, t.id)
+		if d.cancelAttempts[t.id] == t.attempt {
+			delete(d.cancels, t.id)
+			delete(d.cancelAttempts, t.id)
+		}
 		d.mu.Unlock()
 	}()
 
@@ -598,20 +696,22 @@ func (d *DownloadService) run(t downloadTask) {
 			}
 			if pct > 100 {
 				pct = 100
+			} else if pct < 0 {
+				pct = 0
 			}
 			if p.Filename != "" {
 				fm.Lock()
 				lastFile = p.Filename
 				fm.Unlock()
 			}
-			d.emit(TaskProgress{
+			d.emitAttempt(TaskProgress{
 				TaskID: t.id, State: "downloading", Percent: pct,
-				Speed: p.Speed, ETA: p.ETA, BatchID: t.batchID, BatchTitle: t.title,
-			})
-			d.touchBatch(t.id, pct)
+				Speed: p.Speed, ETA: p.ETA, BatchID: t.batchID, BatchTitle: t.batchTitle,
+			}, t.attempt)
+			d.touchBatch(t.id, pct, t.attempt)
 		},
 		OnPostprocess: func(name string) {
-			d.emit(TaskProgress{TaskID: t.id, State: "converting", Percent: 100, BatchID: t.batchID, BatchTitle: t.title})
+			d.emitAttempt(TaskProgress{TaskID: t.id, State: "converting", Percent: 100, BatchID: t.batchID, BatchTitle: t.batchTitle}, t.attempt)
 			d.log(t.id, "postprocess: "+name)
 		},
 		OnFile: func(p string) {
@@ -622,11 +722,15 @@ func (d *DownloadService) run(t downloadTask) {
 		OnLog: func(line string) { d.log(t.id, line) },
 	}
 
-	d.emit(TaskProgress{TaskID: t.id, State: "downloading", BatchID: t.batchID, BatchTitle: t.title})
+	d.emitAttempt(TaskProgress{TaskID: t.id, State: "downloading", BatchID: t.batchID, BatchTitle: t.batchTitle}, t.attempt)
 	args := engine.BuildArgs(t.opts, t.entry, t.pl)
 	err := engine.RunDownload(ctx, args, taskURL(t.entry), hooks)
 
 	d.mu.Lock()
+	if _, exists := d.tasks[t.id]; !exists || d.attempts[t.id] != t.attempt {
+		d.mu.Unlock()
+		return
+	}
 	wasCanceled := d.canceled[t.id]
 	wasPaused := d.paused[t.id]
 	d.mu.Unlock()
@@ -637,25 +741,70 @@ func (d *DownloadService) run(t downloadTask) {
 
 	switch {
 	case wasPaused:
-		d.finish(t.id, "paused", "", "")
+		if d.finish(t.id, t.attempt, "paused", "", "") {
+			d.syncBatch(t.batchID)
+		}
 	case wasCanceled || ctx.Err() != nil:
-		d.finish(t.id, "canceled", "", "")
-		d.syncBatch(t.batchID)
+		if d.finish(t.id, t.attempt, "canceled", "", "") {
+			d.syncBatch(t.batchID)
+		}
 	case err != nil:
-		d.finish(t.id, "error", err.Error(), "")
-		d.syncBatch(t.batchID)
+		if d.finish(t.id, t.attempt, "error", err.Error(), "") {
+			d.syncBatch(t.batchID)
+		}
 	default:
-		d.finish(t.id, "done", "", d.finalPath(t, lf))
-		d.syncBatch(t.batchID)
+		if d.finish(t.id, t.attempt, "done", "", d.finalPath(t, lf)) {
+			d.syncBatch(t.batchID)
+		}
 	}
 }
 
-func (d *DownloadService) finish(taskID, state, errMsg, filePath string) {
+func isTerminalTaskState(state string) bool {
+	switch state {
+	case "done", "error", "canceled", "paused":
+		return true
+	default:
+		return false
+	}
+}
+
+// setStateLocked updates the task and its batch projection while d.mu is held.
+func (d *DownloadService) setStateLocked(p TaskProgress) {
+	d.states[p.TaskID] = p.State
+	if b := d.batches[d.taskBatch[p.TaskID]]; b != nil {
+		switch p.State {
+		case "done", "error", "canceled":
+			b.states[p.TaskID] = p.State
+			if p.State == "done" {
+				b.percent[p.TaskID] = 100
+			}
+		default:
+			delete(b.states, p.TaskID)
+		}
+	}
+}
+
+func publishTaskProgress(p TaskProgress) {
+	if app := application.Get(); app != nil {
+		app.Event.Emit("task:progress", p)
+	}
+}
+
+func (d *DownloadService) finish(taskID string, attempt uint64, state, errMsg, filePath string) bool {
 	d.mu.Lock()
 	t, ok := d.tasks[taskID]
-	if !ok {
+	currentState := d.states[taskID]
+	allowedCancelFromPaused := currentState == "paused" && state == "canceled"
+	if !ok || d.attempts[taskID] != attempt || (isTerminalTaskState(currentState) && !allowedCancelFromPaused) {
 		d.mu.Unlock()
-		return
+		return false
+	}
+	// Cancel/Pause may arrive after run() has inspected ctx.Err() but before
+	// it commits the final result. Do not let that stale result override the
+	// user's action.
+	if d.canceled[taskID] && (state == "done" || state == "error") {
+		d.mu.Unlock()
+		return false
 	}
 	pct := d.percents[taskID]
 	if state == "done" {
@@ -665,20 +814,29 @@ func (d *DownloadService) finish(taskID, state, errMsg, filePath string) {
 	}
 	if state == "error" {
 		d.errors[taskID] = errMsg
-	}
-	if state == "queued" || state == "downloading" {
+	} else {
 		delete(d.errors, taskID)
 	}
-	d.mu.Unlock()
-
-	d.emit(TaskProgress{
+	p := TaskProgress{
 		TaskID: taskID, State: state, Percent: pct, Error: errMsg, FilePath: filePath,
-		BatchID: t.batchID, BatchTitle: t.title,
-	})
+		BatchID: t.batchID, BatchTitle: t.batchTitle,
+	}
+	d.setStateLocked(p)
+	d.mu.Unlock()
+	publishTaskProgress(p)
+	return true
 }
 
-func (d *DownloadService) touchBatch(taskID string, pct float64) {
+func (d *DownloadService) touchBatch(taskID string, pct float64, attempt uint64) {
 	d.mu.Lock()
+	if _, ok := d.tasks[taskID]; !ok || d.attempts[taskID] != attempt {
+		d.mu.Unlock()
+		return
+	}
+	if state := d.states[taskID]; (state != "downloading" && state != "converting") || d.canceled[taskID] {
+		d.mu.Unlock()
+		return
+	}
 	d.percents[taskID] = pct
 	bid := d.taskBatch[taskID]
 	var snap *BatchProgress
@@ -718,28 +876,22 @@ func (d *DownloadService) syncBatch(batchID string) {
 	}
 }
 
-func (d *DownloadService) emit(p TaskProgress) {
+func (d *DownloadService) emitAttempt(p TaskProgress, attempt uint64) bool {
 	d.mu.Lock()
-	if _, ok := d.tasks[p.TaskID]; !ok {
+	if _, ok := d.tasks[p.TaskID]; !ok || d.attempts[p.TaskID] != attempt {
 		d.mu.Unlock()
-		return
+		return false
 	}
-	d.states[p.TaskID] = p.State
-	if b := d.batches[d.taskBatch[p.TaskID]]; b != nil {
-		switch p.State {
-		case "done", "error", "canceled":
-			b.states[p.TaskID] = p.State
-			if p.State == "done" {
-				b.percent[p.TaskID] = 100
-			}
-		default:
-			delete(b.states, p.TaskID)
+	if p.State == "downloading" || p.State == "converting" {
+		if d.canceled[p.TaskID] || d.paused[p.TaskID] || isTerminalTaskState(d.states[p.TaskID]) {
+			d.mu.Unlock()
+			return false
 		}
 	}
+	d.setStateLocked(p)
 	d.mu.Unlock()
-	if app := application.Get(); app != nil {
-		app.Event.Emit("task:progress", p)
-	}
+	publishTaskProgress(p)
+	return true
 }
 
 func (d *DownloadService) emitBatch(p BatchProgress) {

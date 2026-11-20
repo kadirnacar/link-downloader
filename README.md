@@ -11,19 +11,19 @@ indirme motoru olarak [yt-dlp](https://github.com/yt-dlp/yt-dlp) ve ffmpeg kulla
 
 ## ✨ Özellikler
 
-- 🔗 **Akıllı URL analizi** — video, playlist, shorts, live ve mix URL'lerini otomatik ayrıştırır.
+- 🔗 **Akıllı URL analizi** — HTTPS YouTube video, playlist, shorts, live ve mix URL'lerini otomatik ayrıştırır; desteklenmeyen alan adlarını kabul etmez.
 - 📋 **Playlist önizleme** — tüm öğeler kapak görseli, sıra no ve süre ile listelenir; arama + toplu seçim.
 - 🎵 **Ses / Video kuralları** — MP3/M4A/OPUS/FLAC/WAV + kalite; video için çözünürlük ve kap (mp4/mkv/webm).
 - 📁 **Dosya adı şablonları** — `%(playlist_index)03d - %(title)s.%(ext)s` vb.; playlist indeksi uygulama
   tarafında gerçek sıra numarasıyla doldurulur (dosya adında `NA`/`000` oluşmaz).
-- ⬇️ **Çok iş parçacıklı kuyruk** — 3 eşzamanlı indirme worker'ı.
+- ⬇️ **Çok iş parçacıklı kuyruk** — varsayılan 3; ayarlardan 1–8 eşzamanlı worker.
 - ⏯️ **Görev kontrolleri** — Duraklat, Devam, İptal, Yeniden dene, Finder'da göster, Tekil sil.
 - 🧹 **Toplu işlemler** — Tümünü iptal et, Bitenleri temizle, Tümünü temizle.
 - 📊 **Canlı ilerleme** — dosya bazında yüzde/hız/ETA; playlist bazında toplam ilerleme
   (başarısız öğeler de ilerlemeye dahil) ve işlem bitince toast bildirimi.
 - 🧰 **Bağımlılık yönetimi** — yt-dlp / ffmpeg / ffprobe / JS runtime eksikse uygulama içinden
   tek tıkla otomatik kurulum; "yt-dlp Güncelle" ile sürüm tazeleme.
-- 💾 **Kalıcı ayarlar** — seçenekler OS kullanıcı yapılandırma dizininde saklanır.
+- 💾 **Kalıcı ayarlar** — seçenekler OS kullanıcı yapılandırma dizininde atomik olarak ve kullanıcıya özel dosya izinleriyle saklanır.
 
 ## 🧱 Teknoloji Yığını
 
@@ -38,7 +38,7 @@ indirme motoru olarak [yt-dlp](https://github.com/yt-dlp/yt-dlp) ve ffmpeg kulla
 
 - macOS (geliştirme hedefi; Wails v3 çoklu platform destekler)
 - Go **≥ 1.27**
-- Node.js **≥ 18** + npm
+- Node.js **≥ 20.19** (veya **≥ 22.13**) + npm; Vite 8 ve eklentilerinin engine gereksinimi
 - Wails v3 CLI:
   ```bash
   go install github.com/wailsapp/wails/v3/cmd/wails3@latest
@@ -58,7 +58,7 @@ cd link-downloader
 go mod tidy
 
 # 3) Frontend bağımlılıklarını kur
-cd frontend && npm install && cd ..
+cd frontend && npm ci && cd ..
 
 # 4) Wails TypeScript binding'lerini üret
 wails3 generate bindings -clean=true -ts -i
@@ -91,10 +91,12 @@ task package
 ```
 
 ### Testler
+İş mantığı ve servis testleri:
 ```bash
-go test ./...
-cd frontend && npm run build:dev
+go test ./internal/... ./services/...
 ```
+Masaüstü uygulamasının tam derlemesi için `wails3 build` kullanın; bu işlem
+`frontend/dist` çıktısını üretip Go uygulamasına gömer.
 
 ---
 
@@ -124,9 +126,12 @@ cd frontend && npm run build:dev
 
 ## ⚙️ Ayarlar
 
-Seçenekler kalıcı olarak şu dosyada saklanır:
+Seçenekler, işletim sisteminin kullanıcı yapılandırma dizinindeki `ytdlp-studio`
+klasöründe saklanır:
 
-- macOS: `~/Library/Application Support/ytdlp-studio/settings.json`
+- macOS: `~/Library/Application Support/ytdlp-studio/`
+- Windows: `%AppData%\ytdlp-studio\`
+- Linux: `$XDG_CONFIG_HOME/ytdlp-studio/` (tanımlı değilse `~/.config/ytdlp-studio/`)
 
 ## 🗂️ Proje Yapısı
 
@@ -198,23 +203,13 @@ GOOS=linux GOARCH=arm64 task build      # örn. Raspberry Pi / ARM sunucu
 GOOS=windows GOARCH=arm64 task build    # Windows on ARM
 ```
 
-### Headless / server modu (GUI'siz, CGO'suz)
-
-```bash
-GOOS=linux GOARCH=amd64 task build:server   # yalnızca HTTP sunucu
-task build:docker                            # server modu için Docker imajı
-task run:docker                              # imajı çalıştır
-```
-
-Server modu WebKit/CGO gerektirmez; düz Go cross-compile ile her platforma üretilebilir.
-
 ### Cross-compile notları
 
 - Frontend (`frontend/dist`) platformdan bağımsızdır ve binary'ye gömülür (`//go:embed`).
 - yt-dlp / ffmpeg / ffprobe / bun, hedef platforma uygun sürümleriyle **çalışma zamanında**
   otomatik indirilir; cross-build imajına dahil etmenize gerek yoktur.
-- `DownloadService.Reveal` ("Finder'da göster") şu an yalnızca macOS'ta çalışır;
-  Windows/Linux hedeflerinde hata döner.
+- `DownloadService.Reveal` macOS'ta Finder, Windows'ta Explorer kullanır; Linux'ta
+  dosyanın bulunduğu klasörü `xdg-open` ile açar.
 - CI önerisi: matrix kullanarak `windows-latest` üzerinde `task package` (MSIX dahil),
   `ubuntu-latest` + Docker imajı ile `GOOS=linux task build/package`.
 <!-- ytdlp-studio:xcompile v1:end -->

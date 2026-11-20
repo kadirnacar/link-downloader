@@ -7,7 +7,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
+	"math"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -35,7 +37,7 @@ func num(s string) float64 {
 		return 0
 	}
 	v, err := strconv.ParseFloat(s, 64)
-	if err != nil {
+	if err != nil || math.IsNaN(v) || math.IsInf(v, 0) {
 		return 0
 	}
 	return v
@@ -49,19 +51,59 @@ func binary() (string, error) {
 	return b, nil
 }
 
-// EntryURL indirilecek hedef URL'yi garanti eder.
-func EntryURL(id, url string) string {
-	u := strings.TrimSpace(url)
-	if u != "" {
-		return u
-	}
-	if strings.TrimSpace(id) != "" {
-		return "https://www.youtube.com/watch?v=" + strings.TrimSpace(id)
-	}
-	return ""
+// RunDownload argümanların SONUNA '-- <url>' ekleyerek çalıştırır.
+var sensitiveArgumentFlags = map[string]bool{
+	"--cookies":              true,
+	"--cookies-from-browser": true,
+	"--proxy":                true,
+	"--username":             true,
+	"-u":                     true,
+	"--password":             true,
+	"-p":                     true,
+	"--video-password":       true,
+	"--ap-password":          true,
+	"--add-headers":          true,
+	"--add-header":           true,
+	"--extractor-args":       true,
+	"--exec":                 true,
+	"--exec-before-download": true,
+	"--postprocessor-args":   true,
+	"--referer":              true,
+	"--paths":                true,
+	"-P":                     true,
+	"-o":                     true,
+	"--output":               true,
+	"--download-archive":     true,
+	"--cache-dir":            true,
+	"--ffmpeg-location":      true,
+	"--config-locations":     true,
 }
 
-// RunDownload argümanların SONUNA '-- <url>' ekleyerek çalıştırır.
+// redactArgsForLog removes credentials and private local paths from command logs.
+func redactArgsForLog(args []string) []string {
+	redacted := make([]string, len(args))
+	hideNext := false
+	for i, arg := range args {
+		if hideNext {
+			redacted[i] = "[REDACTED]"
+			hideNext = false
+			continue
+		}
+		flag, _, hasValue := strings.Cut(arg, "=")
+		if !sensitiveArgumentFlags[flag] {
+			redacted[i] = arg
+			continue
+		}
+		if hasValue {
+			redacted[i] = flag + "=[REDACTED]"
+		} else {
+			redacted[i] = arg
+			hideNext = true
+		}
+	}
+	return redacted
+}
+
 func RunDownload(ctx context.Context, args []string, url string, h Hooks) error {
 	bin, err := binary()
 	if err != nil {
@@ -82,7 +124,7 @@ func RunDownload(ctx context.Context, args []string, url string, h Hooks) error 
 	final = append(final, "--", target)
 
 	if h.OnLog != nil {
-		h.OnLog("cmd: yt-dlp " + strings.Join(final, " "))
+		h.OnLog("cmd: yt-dlp " + strings.Join(redactArgsForLog(final), " "))
 	}
 
 	cmd := exec.CommandContext(ctx, bin, final...)
@@ -142,23 +184,48 @@ func RunDownload(ctx context.Context, args []string, url string, h Hooks) error 
 		}
 	}
 
-	scan := func(r io.Reader, isErr bool) {
+	scan := func(r io.Reader, isErr bool) error {
 		sc := bufio.NewScanner(r)
 		sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 		for sc.Scan() {
 			handle(sc.Text(), isErr)
 		}
+		return sc.Err()
 	}
 
+	scanErrs := make(chan error, 2)
 	var wg sync.WaitGroup
+	readPipe := func(r io.Reader, isErr bool) {
+		defer wg.Done()
+		if err := scan(r, isErr); err != nil {
+			scanErrs <- err
+			// Scanner bir token sınırına takılırsa pipe'ı tüketmeye devam et.
+			// Aksi hâlde yt-dlp pipe buffer'ı dolduğu için çıkışta kilitlenebilir.
+			_, _ = io.Copy(io.Discard, r)
+		}
+	}
+
 	wg.Add(2)
-	go func() { defer wg.Done(); scan(stdout, false) }()
-	go func() { defer wg.Done(); scan(stderr, true) }()
+	go readPipe(stdout, false)
+	go readPipe(stderr, true)
 	wg.Wait()
+	close(scanErrs)
 
 	werr := cmd.Wait()
+	var scanErr error
+	for err := range scanErrs {
+		if scanErr == nil {
+			scanErr = err
+		}
+	}
 	if ctx.Err() != nil {
 		return ctx.Err()
+	}
+	if scanErr != nil {
+		if werr != nil {
+			return fmt.Errorf("yt-dlp çıktısı okunamadı: %v (komut hatası: %w)", scanErr, werr)
+		}
+		return fmt.Errorf("yt-dlp çıktısı okunamadı: %w", scanErr)
 	}
 	if werr != nil {
 		emu.Lock()
@@ -200,13 +267,4 @@ func ExtractInfo(ctx context.Context, target string, extra ...string) ([]byte, e
 		return nil, errors.New(msg)
 	}
 	return out.Bytes(), nil
-}
-
-func Version(ctx context.Context) (string, error) {
-	bin, err := binary()
-	if err != nil {
-		return "", err
-	}
-	out, err := exec.CommandContext(ctx, bin, "--version").Output()
-	return strings.TrimSpace(string(out)), err
 }
