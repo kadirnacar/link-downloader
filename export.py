@@ -61,7 +61,12 @@ DEFAULT_INCLUDES = [
     "*.ps1",
     "*.md",
     "*.html",
-    "Dockerfile"
+    "Dockerfile*",       # Dockerfile, Dockerfile.linux, Dockerfile.arm64
+    ".gitignore",
+    ".gitattributes",
+    "*.desktop",
+    "*.manifest",
+    "*.command",
     # "*.swift",
     # "*.plist",
     # "*.storyboard",
