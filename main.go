@@ -46,7 +46,7 @@ func main() {
 	app.Window.NewWithOptions(opts)
 
 	if appCfg.CheckDepsOnStart {
-		go deps.CheckDeps()
+		go deps.EnsureDeps()
 	}
 	if appCfg.YtDlpAutoUpdate {
 		go func() { _, _ = deps.UpdateYtDlp(appCfg.YtDlpChannel) }()

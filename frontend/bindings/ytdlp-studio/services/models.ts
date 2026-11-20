@@ -26,7 +26,11 @@ export interface DepStatus {
     "jsRuntime": string;
     "ytDlpPath": string;
     "ytDlpVersion": string;
+    "ffmpegPath": string;
+    "ffprobePath": string;
+    "toolDir": string;
     "missing": string[] | null;
+    "notes": string[] | null;
 }
 
 export interface LogLine {

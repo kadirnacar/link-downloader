@@ -13,8 +13,19 @@ export function CheckDeps(): $CancellablePromise<$models.DepStatus> {
     return $Call.ByID(1756083341);
 }
 
+/**
+ * EnsureDeps eksikleri indirir, kurar ve binary'leri gerçekten çalıştırarak doğrular.
+ */
+export function EnsureDeps(): $CancellablePromise<$models.DepStatus> {
+    return $Call.ByID(3335499005);
+}
+
 export function InstallDeps(): $CancellablePromise<$models.DepStatus> {
     return $Call.ByID(900204982);
+}
+
+export function ToolDirectory(): $CancellablePromise<string> {
+    return $Call.ByID(2175332222);
 }
 
 export function UpdateYtDlp(channel: string): $CancellablePromise<string> {

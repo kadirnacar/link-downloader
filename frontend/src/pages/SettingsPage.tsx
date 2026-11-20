@@ -42,6 +42,16 @@ export function SettingsPage() {
     catch (e) { setMsg(String(e)); }
     finally { set({ installing: false }); }
   }
+  async function ensure() {
+    set({ installing: true });
+    try {
+      const d = await (DepsService as any).EnsureDeps();
+      set({ deps: d });
+      setMsg("Bileşenler kuruldu ve doğrulandı.");
+    } catch (e) { setMsg(String(e)); }
+    finally { set({ installing: false }); }
+  }
+
   async function update() {
     setMsg("yt-dlp güncelleniyor…");
     try { setMsg((await DepsService.UpdateYtDlp(app.ytDlpChannel)).trim() || "Güncel."); }
@@ -86,6 +96,12 @@ export function SettingsPage() {
               <div className="status-row"><span>ffmpeg</span><span className={deps?.ffmpeg ? "tag good" : "tag bad"}>{deps?.ffmpeg ? "Kurulu" : "Eksik"}</span></div>
               <div className="status-row"><span>ffprobe</span><span className={deps?.ffprobe ? "tag good" : "tag bad"}>{deps?.ffprobe ? "Kurulu" : "Eksik"}</span></div>
               <div className="status-row"><span>JS runtime</span><strong>{deps?.jsRuntime || "—"}</strong></div>
+              <div className="status-row"><span>ffmpeg</span><code>{(deps as any)?.ffmpegPath || "—"}</code></div>
+              <div className="status-row"><span>ffprobe</span><code>{(deps as any)?.ffprobePath || "—"}</code></div>
+              <div className="status-row"><span>Araç dizini</span><code>{(deps as any)?.toolDir || "—"}</code></div>
+              {((deps as any)?.notes ?? []).map((n: string, i: number) => (
+                <div key={i} className="hint">{n}</div>
+              ))}
               <div className="field">
                 <label>Güncelleme kanalı</label>
                 <select value={app.ytDlpChannel} onChange={(e) => patchApp({ ytDlpChannel: e.target.value })}>
@@ -103,6 +119,7 @@ export function SettingsPage() {
               <div className="inline">
                 <button className="btn" onClick={() => void DepsService.CheckDeps().then((d) => set({ deps: d }))}>Yeniden denetle</button>
                 <button className="btn primary" disabled={installing} onClick={() => void install()}>{installing ? "Kuruluyor…" : "Eksikleri kur"}</button>
+                <button className="btn" disabled={installing} onClick={() => void ensure()}>Kur ve doğrula</button>
                 <button className="btn" onClick={() => void update()}>yt-dlp güncelle</button>
               </div>
             </div>
