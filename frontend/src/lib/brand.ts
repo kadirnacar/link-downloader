@@ -3,7 +3,7 @@
 export const BRAND = {
   app: "ytdlp-studio",
   display: "ytdlp-studio",
-  version: "1.0.0",
+  version: "1.0.1",
   company: "Bengsoft",
   developer: "Kadir Niyazi AÇAR",
   email: "kadirnacar@kadirnacar.com",
