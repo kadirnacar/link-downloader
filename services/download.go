@@ -56,12 +56,13 @@ type LogLine struct {
 }
 
 type downloadTask struct {
-	id      string
-	batchID string
-	title   string
-	entry   model.MediaEntry
-	opts    model.DownloadOptions
-	pl      engine.PlaylistContext
+	id         string
+	batchID    string
+	batchTitle string
+	title      string
+	entry      model.MediaEntry
+	opts       model.DownloadOptions
+	pl         engine.PlaylistContext
 }
 
 type batchState struct {

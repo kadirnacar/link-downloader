@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-apply_round2.py — Round 2 patch
-  - export.py: Dockerfile* glob + repo hygiene config dosyaları
-  - main.go:   EnsureDeps / UpdateYtDlp hata yolları
+apply_round3.py — Round 3
+  - services/download.go: downloadTask.batchTitle field eklendi
+    (TaskProgress.BatchTitle artık batch başlığını taşır, task başlığını değil)
+  - services/download_test.go: YENİ — queue/batch unit testleri
 
-Ön koşul: apply_refactor.py çalışmış olmalı (main.go opts bloğu temizlenmiş).
-Idempotent: yeniden çalıştırılabilir; değişiklik zaten varsa SKIP.
-Backup YOK — değişiklikleri Git ile geri alın.
+Ön koşul: apply_refactor.py + apply_round2.py çalışmış olmalı.
+Idempotent. Backup YOK.
 """
 
 import sys
@@ -29,20 +29,21 @@ def read(path):
 
 
 def write(path, content):
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
 
 
-def patch_exact(path, old, new, description, idempotent_marker=None):
+def patch_exact(path, old, new, description, skip_if_present=None):
     content = read(path)
-    if idempotent_marker and idempotent_marker in content:
+    if skip_if_present and skip_if_present in content:
         report("SKIP", path, f"zaten uygulanmış ({description})")
         return False
-    count = content.count(old)
-    if count == 0:
-        raise RuntimeError(f"Beklenen içerik yok: {path}\n  {description}\n"
-                           f"  Aranan (kısaltıldı): {old[:120]!r}")
-    if count > 1:
-        raise RuntimeError(f"Belirsiz ({count} eşleşme): {path}\n  {description}")
+    n = content.count(old)
+    if n == 0:
+        raise RuntimeError(f"Beklenen içerik yok: {path}\n  Açıklama: {description}\n"
+                           f"  Aranan:\n{old[:200]}")
+    if n > 1:
+        raise RuntimeError(f"Belirsiz ({n} eşleşme): {path}\n  Açıklama: {description}")
     new_content = content.replace(old, new, 1)
     if new not in new_content:
         raise RuntimeError(f"Post-patch doğrulama başarısız: {path}")
@@ -52,116 +53,293 @@ def patch_exact(path, old, new, description, idempotent_marker=None):
 
 
 # ============================================================
-# export.py — Dockerfile* + config uzantıları
+# services/download.go — downloadTask.batchTitle + 6 fix
 # ============================================================
-def fix_export_py():
-    path = ROOT / "export.py"
-    old = (
-        '    "*.html",\n'
-        '    "Dockerfile"\n'
+def fix_download_go():
+    path = ROOT / "services" / "download.go"
+
+    # 1) Struct'a batchTitle ekle
+    old_struct = (
+        "type downloadTask struct {\n"
+        "\tid      string\n"
+        "\tbatchID string\n"
+        "\ttitle   string\n"
+        "\tentry   model.MediaEntry\n"
+        "\topts    model.DownloadOptions\n"
+        "\tpl      engine.PlaylistContext\n"
+        "}"
     )
-    new = (
-        '    "*.html",\n'
-        '    "Dockerfile*",       # Dockerfile, Dockerfile.linux, Dockerfile.arm64\n'
-        '    ".gitignore",\n'
-        '    ".gitattributes",\n'
-        '    "*.desktop",\n'
-        '    "*.manifest",\n'
-        '    "*.command",\n'
+    new_struct = (
+        "type downloadTask struct {\n"
+        "\tid         string\n"
+        "\tbatchID    string\n"
+        "\tbatchTitle string\n"
+        "\ttitle      string\n"
+        "\tentry      model.MediaEntry\n"
+        "\topts       model.DownloadOptions\n"
+        "\tpl         engine.PlaylistContext\n"
+        "}"
     )
-    patch_exact(path, old, new,
-                "Dockerfile* glob + .gitignore/.gitattributes/.desktop/.manifest/.command",
-                idempotent_marker='"Dockerfile*"')
+    patch_exact(path, old_struct, new_struct,
+                "downloadTask.batchTitle alanı eklendi")
+
+    # 2) Enqueue'da batchTitle ata
+    old_enq = '\t\tt := downloadTask{id: id, batchID: bid, title: e.Title, opts: opts, pl: pl}'
+    new_enq = '\t\tt := downloadTask{id: id, batchID: bid, batchTitle: title, title: e.Title, opts: opts, pl: pl}'
+    patch_exact(path, old_enq, new_enq,
+                "Enqueue: batchTitle atandı")
+
+    # 3) Resume
+    patch_exact(path,
+        '\td.emit(TaskProgress{TaskID: taskID, State: "queued", BatchID: bid, BatchTitle: t.title})',
+        '\td.emit(TaskProgress{TaskID: taskID, State: "queued", BatchID: bid, BatchTitle: t.batchTitle})',
+        "Resume: BatchTitle düzeltildi")
+
+    # 4) run() başlangıç
+    patch_exact(path,
+        '\td.emit(TaskProgress{TaskID: t.id, State: "downloading", BatchID: t.batchID, BatchTitle: t.title})',
+        '\td.emit(TaskProgress{TaskID: t.id, State: "downloading", BatchID: t.batchID, BatchTitle: t.batchTitle})',
+        "run() ilk emit: BatchTitle düzeltildi")
+
+    # 5) run() OnProgress
+    patch_exact(path,
+        "\t\t\td.emit(TaskProgress{\n"
+        "\t\t\t\tTaskID: t.id, State: \"downloading\", Percent: pct,\n"
+        "\t\t\t\tSpeed: p.Speed, ETA: p.ETA, BatchID: t.batchID, BatchTitle: t.title,\n"
+        "\t\t\t})",
+        "\t\t\td.emit(TaskProgress{\n"
+        "\t\t\t\tTaskID: t.id, State: \"downloading\", Percent: pct,\n"
+        "\t\t\t\tSpeed: p.Speed, ETA: p.ETA, BatchID: t.batchID, BatchTitle: t.batchTitle,\n"
+        "\t\t\t})",
+        "run() OnProgress: BatchTitle düzeltildi")
+
+    # 6) run() OnPostprocess
+    patch_exact(path,
+        '\t\t\td.emit(TaskProgress{TaskID: t.id, State: "converting", Percent: 100, BatchID: t.batchID, BatchTitle: t.title})',
+        '\t\t\td.emit(TaskProgress{TaskID: t.id, State: "converting", Percent: 100, BatchID: t.batchID, BatchTitle: t.batchTitle})',
+        "run() OnPostprocess: BatchTitle düzeltildi")
+
+    # 7) finish()
+    patch_exact(path,
+        "\td.emit(TaskProgress{\n"
+        "\t\tTaskID: taskID, State: state, Percent: pct, Error: errMsg, FilePath: filePath,\n"
+        "\t\tBatchID: t.batchID, BatchTitle: t.title,\n"
+        "\t})",
+        "\td.emit(TaskProgress{\n"
+        "\t\tTaskID: taskID, State: state, Percent: pct, Error: errMsg, FilePath: filePath,\n"
+        "\t\tBatchID: t.batchID, BatchTitle: t.batchTitle,\n"
+        "\t})",
+        "finish(): BatchTitle düzeltildi")
+
+    # 8) Snapshot()
+    patch_exact(path,
+        "\t\tout = append(out, TaskProgress{\n"
+        "\t\t\tTaskID: id, State: st, Percent: d.percents[id],\n"
+        "\t\t\tError: d.errors[id], FilePath: d.files[id],\n"
+        "\t\t\tBatchID: t.batchID, BatchTitle: t.title,\n"
+        "\t\t})",
+        "\t\tout = append(out, TaskProgress{\n"
+        "\t\t\tTaskID: id, State: st, Percent: d.percents[id],\n"
+        "\t\t\tError: d.errors[id], FilePath: d.files[id],\n"
+        "\t\t\tBatchID: t.batchID, BatchTitle: t.batchTitle,\n"
+        "\t\t})",
+        "Snapshot(): BatchTitle düzeltildi")
 
 
 # ============================================================
-# main.go — goroutine hata yolları
+# services/download_test.go — YENİ
 # ============================================================
-def fix_main_errors():
-    path = ROOT / "main.go"
+TEST_FILE = r'''// ytdlp-studio:download-test v1
+package services
 
-    # --- EnsureDeps ---
-    old_deps = (
-        '\tif appCfg.CheckDepsOnStart {\n'
-        '\t\tgo deps.EnsureDeps()\n'
-        '\t}\n'
-    )
-    new_deps = (
-        '\tif appCfg.CheckDepsOnStart {\n'
-        '\t\tgo func() {\n'
-        '\t\t\tif _, err := deps.EnsureDeps(); err != nil {\n'
-        '\t\t\t\tlog.Printf("dependency check failed: %v", err)\n'
-        '\t\t\t}\n'
-        '\t\t}()\n'
-        '\t}\n'
-    )
+import (
+	"context"
+	"testing"
 
-    content = read(path)
-    if new_deps in content:
-        report("SKIP", path, "EnsureDeps hata yolu zaten ekli")
-    elif old_deps in content:
-        patch_exact(path, old_deps, new_deps, "EnsureDeps hata yakalama")
-    else:
-        # space-indent fallback
-        old_sp = old_deps.replace("\t", "    ")
-        if old_sp in content:
-            patch_exact(path, old_sp, new_deps.replace("\t", "    "),
-                        "EnsureDeps hata yakalama (space indent)")
-        else:
-            raise RuntimeError(
-                "EnsureDeps bloğu main.go'da bulunamadı. "
-                "apply_refactor.py sonrası main.go değişmiş olabilir; "
-                "elle kontrol edin."
-            )
+	"ytdlp-studio/internal/model"
+)
 
-    # --- UpdateYtDlp ---
-    old_upd = (
-        '\tif appCfg.YtDlpAutoUpdate {\n'
-        '\t\tgo func() { _, _ = deps.UpdateYtDlp(appCfg.YtDlpChannel) }()\n'
-        '\t}\n'
-    )
-    new_upd = (
-        '\tif appCfg.YtDlpAutoUpdate {\n'
-        '\t\tgo func() {\n'
-        '\t\t\tif _, err := deps.UpdateYtDlp(appCfg.YtDlpChannel); err != nil {\n'
-        '\t\t\t\tlog.Printf("yt-dlp auto-update failed (channel=%s): %v", appCfg.YtDlpChannel, err)\n'
-        '\t\t\t}\n'
-        '\t\t}()\n'
-        '\t}\n'
-    )
+// newTestService worker başlatmayan bir DownloadService döndürür.
+// Böylece testler yt-dlp/ffmpeg spawn etmez; sadece kuyruk ve state
+// makineleri test edilir.
+func newTestService() *DownloadService {
+	return &DownloadService{
+		queue:     make(chan downloadTask, 64),
+		cancels:   map[string]context.CancelFunc{},
+		canceled:  map[string]bool{},
+		paused:    map[string]bool{},
+		tasks:     map[string]downloadTask{},
+		states:    map[string]string{},
+		percents:  map[string]float64{},
+		files:     map[string]string{},
+		errors:    map[string]string{},
+		batches:   map[string]*batchState{},
+		taskBatch: map[string]string{},
+	}
+}
 
-    content = read(path)  # re-read after first patch
-    if new_upd in content:
-        report("SKIP", path, "UpdateYtDlp hata yolu zaten ekli")
-    elif old_upd in content:
-        patch_exact(path, old_upd, new_upd, "UpdateYtDlp hata yakalama")
-    else:
-        old_sp = old_upd.replace("\t", "    ")
-        if old_sp in content:
-            patch_exact(path, old_sp, new_upd.replace("\t", "    "),
-                        "UpdateYtDlp hata yakalama (space indent)")
-        else:
-            raise RuntimeError(
-                "UpdateYtDlp bloğu main.go'da bulunamadı. "
-                "Orijinalde '_, _ = deps.UpdateYtDlp(...)' satırı bekleniyordu."
-            )
+func testOptions(t *testing.T) model.DownloadOptions {
+	t.Helper()
+	o := model.DefaultOptions()
+	o.OutputDir = t.TempDir()
+	return o
+}
+
+func TestEnqueue_CreatesBatchAndTasks(t *testing.T) {
+	d := newTestService()
+	entries := []model.MediaEntry{
+		{ID: "aaa", Title: "Video A", Available: true},
+		{ID: "bbb", Title: "Video B", Available: true},
+	}
+	ids, err := d.Enqueue(entries, testOptions(t), BatchInfo{Title: "My Batch", Kind: "playlist"})
+	if err != nil {
+		t.Fatalf("Enqueue hata: %v", err)
+	}
+	if len(ids) != 2 {
+		t.Fatalf("2 id bekleniyordu, %d geldi", len(ids))
+	}
+	if len(d.batches) != 1 {
+		t.Fatalf("1 batch bekleniyordu, %d geldi", len(d.batches))
+	}
+	snap := d.Snapshot()
+	if len(snap) != 2 {
+		t.Fatalf("2 snapshot bekleniyordu, %d geldi", len(snap))
+	}
+	for _, p := range snap {
+		if p.State != "queued" {
+			t.Fatalf("state 'queued' bekleniyordu, %q geldi", p.State)
+		}
+	}
+}
+
+func TestEnqueue_EmptyEntries(t *testing.T) {
+	d := newTestService()
+	if _, err := d.Enqueue(nil, testOptions(t), BatchInfo{Title: "X"}); err == nil {
+		t.Fatalf("boş entries için hata bekleniyordu")
+	}
+}
+
+// Regression: Snapshot, TaskProgress.BatchTitle'da batch başlığını taşımalı
+// (entry/task başlığını değil).
+func TestSnapshot_BatchTitle(t *testing.T) {
+	d := newTestService()
+	entries := []model.MediaEntry{{ID: "x1", Title: "Entry Title", Available: true}}
+	if _, err := d.Enqueue(entries, testOptions(t), BatchInfo{Title: "Batch Title", Kind: "playlist"}); err != nil {
+		t.Fatalf("Enqueue hata: %v", err)
+	}
+	snap := d.Snapshot()
+	if len(snap) != 1 {
+		t.Fatalf("1 snapshot bekleniyordu, %d geldi", len(snap))
+	}
+	if snap[0].BatchTitle != "Batch Title" {
+		t.Fatalf("BatchTitle 'Batch Title' olmalıydı, %q geldi", snap[0].BatchTitle)
+	}
+}
+
+func TestCancel_UpdatesState(t *testing.T) {
+	d := newTestService()
+	ids, err := d.Enqueue(
+		[]model.MediaEntry{{ID: "c1", Title: "C", Available: true}},
+		testOptions(t), BatchInfo{Title: "B", Kind: "file"},
+	)
+	if err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+	d.Cancel(ids[0])
+	snap := d.Snapshot()
+	if len(snap) != 1 || snap[0].State != "canceled" {
+		t.Fatalf("canceled beklendi: %+v", snap)
+	}
+}
+
+func TestPause_UpdatesState(t *testing.T) {
+	d := newTestService()
+	ids, err := d.Enqueue(
+		[]model.MediaEntry{{ID: "p1", Title: "P", Available: true}},
+		testOptions(t), BatchInfo{Title: "B", Kind: "file"},
+	)
+	if err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+	d.Pause(ids[0])
+	snap := d.Snapshot()
+	if len(snap) != 1 || snap[0].State != "paused" {
+		t.Fatalf("paused beklendi: %+v", snap)
+	}
+}
+
+func TestClearFinished_RemovesDoneTasks(t *testing.T) {
+	d := newTestService()
+	ids, err := d.Enqueue(
+		[]model.MediaEntry{
+			{ID: "f1", Title: "F1", Available: true},
+			{ID: "f2", Title: "F2", Available: true},
+		},
+		testOptions(t), BatchInfo{Title: "B", Kind: "playlist"},
+	)
+	if err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+	d.Cancel(ids[0])
+	d.ClearFinished()
+	snap := d.Snapshot()
+	if len(snap) != 1 {
+		t.Fatalf("1 kalan görev bekleniyordu, %d geldi", len(snap))
+	}
+	if snap[0].TaskID != ids[1] {
+		t.Fatalf("kalan görev %q olmalıydı, %q geldi", ids[1], snap[0].TaskID)
+	}
+}
+
+func TestBatches_ReportsTotalAndProgress(t *testing.T) {
+	d := newTestService()
+	entries := []model.MediaEntry{
+		{ID: "g1", Title: "G1", Available: true},
+		{ID: "g2", Title: "G2", Available: true},
+		{ID: "g3", Title: "G3", Available: true},
+	}
+	if _, err := d.Enqueue(entries, testOptions(t), BatchInfo{Title: "Three", Kind: "playlist"}); err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+	bs := d.Batches()
+	if len(bs) != 1 {
+		t.Fatalf("1 batch bekleniyordu, %d geldi", len(bs))
+	}
+	if bs[0].Total != 3 {
+		t.Fatalf("Total 3 olmalıydı, %d geldi", bs[0].Total)
+	}
+	if bs[0].Done {
+		t.Fatalf("Done false olmalıydı (henüz hiçbir task tamamlanmadı)")
+	}
+}
+'''
 
 
+def create_test_file():
+    path = ROOT / "services" / "download_test.go"
+    if path.exists():
+        report("SKIP", path, "zaten var")
+        return
+    write(path, TEST_FILE)
+    report("OK", path, "yeni test dosyası oluşturuldu (7 test)")
+
+
+# ============================================================
+# MAIN
+# ============================================================
 def main():
     print("=" * 62)
-    print("apply_round2.py")
+    print("apply_round3.py")
     print("=" * 62)
 
-    # Sanity: proje kökünde miyiz?
-    if not (ROOT / "main.go").exists() or not (ROOT / "export.py").exists():
-        print(f"✗ Proje kökünde değiliz: {ROOT}")
-        print("  main.go ve export.py bu dizinde olmalı.")
+    if not (ROOT / "services" / "download.go").exists():
+        print(f"✗ services/download.go yok. Kök: {ROOT}")
         sys.exit(1)
     print(f"✓ Proje kökü: {ROOT}")
 
     steps = [
-        ("export.py — filtre düzeltmesi", fix_export_py),
-        ("main.go — hata yakalama", fix_main_errors),
+        ("services/download.go — BatchTitle fix", fix_download_go),
+        ("services/download_test.go — yeni testler", create_test_file),
     ]
     failed = []
     for label, fn in steps:
@@ -183,7 +361,7 @@ def main():
         print(f"\n{len(failed)} adım başarısız.")
         sys.exit(1)
 
-    print(f"\n✓ Round 2 tamamlandı ({len(CHANGES)} adım).")
+    print(f"\n✓ Round 3 tamamlandı ({len(CHANGES)} adım).")
 
 
 if __name__ == "__main__":
