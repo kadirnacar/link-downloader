@@ -20,7 +20,7 @@ if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then HAS_DO
 
 # Native Linux GUI build için WebKitGTK dev paketleri (CGO) şart
 if ! pkg-config --exists gtk4 webkitgtk-6.0 libsoup-3.0 2>/dev/null; then
-  echo "webkit2gtk-4.1 dev paketleri bulunamadı:"
+  echo "GTK4 / WebKitGTK 6.0 / libsoup-3.0 geliştirme paketleri bulunamadı:"
   echo "  Debian/Ubuntu: sudo apt install libgtk-4-dev libwebkitgtk-6.0-dev libsoup-3.0-dev build-essential pkg-config"
   echo "  Fedora:        sudo dnf install gtk4-devel webkitgtk6.0-devel libsoup3-devel pkg-config"
   echo "  Arch:          sudo pacman -S gtk4 webkitgtk-6.0 libsoup3 pkg-config base-devel"

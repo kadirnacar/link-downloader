@@ -28,6 +28,7 @@ export default function App() {
   const tab = useStore((s) => s.tab);
   const app = useStore((s) => s.app);
   const deps = useStore((s) => s.deps);
+  const info = useStore((s) => s.info);
   const mode = useStore((s) => s.options.mode);
   const installing = useStore((s) => s.installing);
   const notice = useStore((s) => s.notice);
@@ -88,11 +89,15 @@ export default function App() {
       <Sidebar />
       <main className="main">
         <header className="topbar">
-          <div>
-            <div className="eyebrow">ytdlp-studio</div>
+          <div className="topbar-heading">
+            <div className="eyebrow">BENGSOFT / LINK DOWNLOADER</div>
             <h1>{TITLES[tab]}</h1>
           </div>
-          <div className="inline">
+          <div className="topbar-actions">
+            <span className={`tag ${deps ? (missing.length === 0 ? "good" : "warn") : ""}`}>
+              <i className="status-dot" />
+              {!deps ? "Bileşenler denetleniyor" : missing.length === 0 ? "Sistem hazır" : `${missing.length} bileşen eksik`}
+            </span>
             {tab === "analyze" && <span className="tag info">{mode === "audio" ? "Ses modu" : mode === "video" ? "Video modu" : "Altyazı modu"}</span>}
             <button className="btn ghost" onClick={() => set({ tab: "settings", settingsSection: "deps" })}>Bileşenler</button>
           </div>
@@ -115,6 +120,18 @@ export default function App() {
         <div className="page">
           {tab === "analyze" && (
             <>
+              <section className="workspace-intro">
+                <div>
+                  <div className="workspace-kicker">BAĞLANTIYI EKLE · İÇERİĞİ SEÇ · İNDİR</div>
+                  <h2>İçeriğini, kendi kurallarınla indir.</h2>
+                  <p>Video, ses veya playlist. Analizden tamamlanmaya kadar her adımı tek ekrandan takip et.</p>
+                </div>
+                <div className="workspace-highlights" aria-label="Öne çıkan özellikler">
+                  <span><b>01</b> Önizle</span>
+                  <span><b>02</b> Özelleştir</span>
+                  <span><b>03</b> Takip et</span>
+                </div>
+              </section>
               <PasteBar />
               <div className="analyze-grid">
                 <div className="analyze-left">

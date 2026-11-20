@@ -22,7 +22,7 @@ func main() {
 	analyze := &services.AnalyzeService{}
 
 	app := application.New(application.Options{
-		Name: "ytdlp-studio",
+		Name: "Link Downloader",
 		Services: []application.Service{
 			application.NewService(analyze),
 			application.NewService(download),
@@ -35,7 +35,7 @@ func main() {
 	})
 
 	opts := application.WebviewWindowOptions{
-		Title: "ytdlp-studio",
+		Title: "Link Downloader",
 		URL:   "/",
 	}
 	tuneWindow(&opts)

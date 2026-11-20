@@ -9,7 +9,17 @@ export function PreviewList() {
   const set = useStore((s) => s.set);
   const [filter, setFilter] = useState("");
 
-  if (!info) return <section className="card empty">URL yapıştırdığında içerik önizlemesi burada görünür.</section>;
+  if (!info) return (
+    <section className="card preview-empty">
+      <div className="preview-empty-icon" aria-hidden="true">↘</div>
+      <div className="workspace-kicker">AKILLI İÇERİK ÖNİZLEMESİ</div>
+      <h2>İlk bağlantını ekle</h2>
+      <p>Video veya playlist bağlantısını yukarıya yapıştır. Başlıkları, süreleri ve kapakları kontrol ettikten sonra indireceğin öğeleri seç.</p>
+      <div className="preview-benefits">
+        <span>✓ Playlist seçimi</span><span>✓ Ses / video formatları</span><span>✓ Canlı kuyruk takibi</span>
+      </div>
+    </section>
+  );
 
   const entries = info.entries ?? [];
   const visible = entries.filter((e) => (e.title || "").toLowerCase().includes(filter.toLowerCase()));

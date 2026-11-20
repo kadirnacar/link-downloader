@@ -1,229 +1,183 @@
+# Link Downloader
 
-# ytdlp-studio 🎧
+**Link Downloader** (`ytdlp-studio`), YouTube video ve playlist içeriklerini analiz etmek, ses/video/altyazı seçeneklerini belirlemek ve indirmeleri kuyruk üzerinden yönetmek için geliştirilen açık kaynak masaüstü uygulamasıdır.
 
-YouTube video ve playlist'lerinden ses/video indirmek için tasarlanmış masaüstü stüdyosu.
-[Wails v3](https://wails.io) üzerinde Go backend + React/TypeScript frontend ile geliştirilmiştir;
-indirme motoru olarak [yt-dlp](https://github.com/yt-dlp/yt-dlp) ve ffmpeg kullanır.
+<p align="center">
+  <a href="https://ytdlp.bengsoft.com/">Ürün sitesi</a> ·
+  <a href="https://github.com/kadirnacar/link-downloader/releases">İndir / Releases</a> ·
+  <a href="https://github.com/kadirnacar/link-downloader">Kaynak kod</a> ·
+  <a href="website/docs.html">Web dokümantasyonu</a>
+</p>
 
-![ytdlp-studio analiz ekranı](docs/screenshot.png)
+![Link Downloader analiz ekranı](docs/screenshot.png)
 
----
+## Özellikler
 
-## ✨ Özellikler
+- **YouTube URL analizi:** video, playlist, Shorts, canlı yayın ve mix bağlantılarını ayrıştırma.
+- **Playlist önizleme:** içerikleri başlık, sıra numarası, küçük resim ve süreyle listeleme; arama ve çoklu seçim.
+- **Ses indirme:** MP3, M4A, OPUS, FLAC ve WAV formatları ile kalite seçenekleri.
+- **Video indirme:** çözünürlük ve MP4, MKV veya WebM kapsayıcı seçenekleri.
+- **Altyazı:** mevcut dil seçeneklerini listeleme, manuel/otomatik altyazı ayarları ve videoya gömme seçenekleri.
+- **Kuyruk yönetimi:** birden fazla worker, tekil/toplu duraklatma, sürdürme, iptal, yeniden deneme ve temizleme.
+- **Canlı ilerleme:** görev yüzdesi, hız, tahmini süre, durum ve playlist toplam ilerlemesi.
+- **Bağımlılık yönetimi:** yt-dlp, FFmpeg, FFprobe ve JavaScript runtime durumunu görüntüleme; eksikleri uygulamadan kurma.
+- **Gelişmiş ayarlar:** çıktı dizini, dosya adı şablonları, format/kalite, ağ, çerez, playlist ve yt-dlp argümanları.
+- **Günlük ve bildirimler:** işlem günlüklerini görüntüleme/filtreleme ve batch tamamlanma bildirimleri.
 
-- 🔗 **Akıllı URL analizi** — HTTPS YouTube video, playlist, shorts, live ve mix URL'lerini otomatik ayrıştırır; desteklenmeyen alan adlarını kabul etmez.
-- 📋 **Playlist önizleme** — tüm öğeler kapak görseli, sıra no ve süre ile listelenir; arama + toplu seçim.
-- 🎵 **Ses / Video kuralları** — MP3/M4A/OPUS/FLAC/WAV + kalite; video için çözünürlük ve kap (mp4/mkv/webm).
-- 📁 **Dosya adı şablonları** — `%(playlist_index)03d - %(title)s.%(ext)s` vb.; playlist indeksi uygulama
-  tarafında gerçek sıra numarasıyla doldurulur (dosya adında `NA`/`000` oluşmaz).
-- ⬇️ **Çok iş parçacıklı kuyruk** — varsayılan 3; ayarlardan 1–8 eşzamanlı worker.
-- ⏯️ **Görev kontrolleri** — Duraklat, Devam, İptal, Yeniden dene, Finder'da göster, Tekil sil.
-- 🧹 **Toplu işlemler** — Tümünü iptal et, Bitenleri temizle, Tümünü temizle.
-- 📊 **Canlı ilerleme** — dosya bazında yüzde/hız/ETA; playlist bazında toplam ilerleme
-  (başarısız öğeler de ilerlemeye dahil) ve işlem bitince toast bildirimi.
-- 🧰 **Bağımlılık yönetimi** — yt-dlp / ffmpeg / ffprobe / JS runtime eksikse uygulama içinden
-  tek tıkla otomatik kurulum; "yt-dlp Güncelle" ile sürüm tazeleme.
-- 💾 **Kalıcı ayarlar** — seçenekler OS kullanıcı yapılandırma dizininde atomik olarak ve kullanıcıya özel dosya izinleriyle saklanır.
+## Teknoloji yığını
 
-## 🧱 Teknoloji Yığını
+| Katman | Teknoloji |
+| --- | --- |
+| Masaüstü kabuk | Wails v3.0.0 |
+| Backend | Go 1.27 |
+| Frontend | React 18, TypeScript, Zustand, Vite 8 |
+| Binding | Wails tarafından üretilen TypeScript servis binding'leri |
+| Medya motoru | yt-dlp, FFmpeg, FFprobe |
 
-| Katman          | Teknoloji                                    |
-| --------------- | -------------------------------------------- |
-| Masaüstü kabuk  | Wails v3 (native webview)                    |
-| Backend         | Go 1.27, [go-ytdlp](https://github.com/lrstanley/go-ytdlp) |
-| Frontend        | React 18, TypeScript, Zustand, Vite          |
-| İndirme motoru  | yt-dlp + ffmpeg / ffprobe                    |
+## Kullanıcılar için indirme
 
-## 📦 Gereksinimler
+Güncel kurulum ve taşınabilir paketler GitHub Releases sayfasında yayınlanır:
 
-- macOS (geliştirme hedefi; Wails v3 çoklu platform destekler)
-- Go **≥ 1.27**
-- Node.js **≥ 20.19** (veya **≥ 22.13**) + npm; Vite 8 ve eklentilerinin engine gereksinimi
-- Wails v3 CLI:
-  ```bash
-  go install github.com/wailsapp/wails/v3/cmd/wails3@latest
-  ```
-- yt-dlp / ffmpeg / ffprobe: **zorunlu değil** — uygulama ilk açılışta eksikleri otomatik kurabilir.
+**[GitHub Releases — Link Downloader](https://github.com/kadirnacar/link-downloader/releases)**
 
----
+Paket adları ve platform varlıkları sürüme göre değişebilir. İndirmeden önce release notlarını ve paket açıklamalarını kontrol edin. Kullanım adımları için [Kurulum ve Kullanım](docs/INSTALLATION.md) belgesine bakın.
 
-## 🚀 Kurulum
+## Geliştirme ortamı
+
+Projeyi kaynak koddan çalıştırmak için:
+
+- Go **1.27** (modülün `go.mod` hedefi)
+- Node.js **20.19+** veya **22.12+** ve npm (Vite 8 toolchain gereksinimi)
+- Wails CLI **v3.0.0**
+- Task CLI (Taskfile görevlerini kullanmak için)
+- Platforma özgü native WebView/build araçları
+
+### Platform araçları
+
+- **Windows:** WebView2 Runtime (Windows 10/11 sistemlerinde genellikle hazırdır).
+- **macOS:** macOS 13.0+, Xcode Command Line Tools.
+- **Linux:** GCC/build-essential, pkg-config, GTK4, WebKitGTK 6.0 ve libsoup 3.0 geliştirme paketleri. Varsayılan Wails v3.0 yolu Ubuntu 24.04+, Debian 13+ ve Fedora 40+ gibi güncel dağıtımları hedefler; dağıtım bazlı paket adları için `wails3 doctor` kullanın.
+
+### Kurulum
 
 ```bash
-# 1) Depoyu klonla
-git clone https://github.com/KULLANICI_ADI/link-downloader.git
+git clone https://github.com/kadirnacar/link-downloader.git
 cd link-downloader
 
-# 2) Go bağımlılıklarını çöz
-go mod tidy
+# Wails CLI v3.0.0
+go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
 
-# 3) Frontend bağımlılıklarını kur
-cd frontend && npm ci && cd ..
+# Go modülleri
+go mod download
 
-# 4) Wails TypeScript binding'lerini üret
+# Frontend bağımlılıkları
+cd frontend
+npm ci
+cd ..
+
+# Go servislerinden TypeScript binding üretimi
 wails3 generate bindings -clean=true -ts -i
 ```
 
-## 🔨 Derleme
+### Geliştirme modunda çalıştırma
 
-### Geliştirme modu (hot-reload)
 ```bash
 wails3 dev
-# veya
+# veya Task CLI kuruluysa
 task dev
 ```
 
 ### Üretim derlemesi
+
 ```bash
 wails3 build
 # veya
 task build
 ```
 
-#### Windows
+Örnek cross-target derlemeleri Taskfile üzerinden yapılır:
+
 ```bash
-GOOS=windows GOARCH=amd64 wails3 build
+GOOS=windows GOARCH=amd64 task build
+GOOS=linux GOARCH=amd64 task build
+GOOS=darwin GOARCH=arm64 task build
 ```
 
-### macOS paketleme (.app)
-```bash
-task package
-```
+Linux GUI derlemeleri CGO, GTK ve WebKitGTK geliştirme bağımlılıkları gerektirebilir. Farklı host/target kombinasyonlarında Taskfile Docker cross-compile yolunu kullanabilir.
 
-### Testler
-İş mantığı ve servis testleri:
+### Testler ve statik doğrulama
+
+Depodaki doğrulama akışının kullandığı Go test kapsamı:
+
 ```bash
 go test ./internal/... ./services/...
+go vet ./internal/... ./services/...
 ```
-Masaüstü uygulamasının tam derlemesi için `wails3 build` kullanın; bu işlem
-`frontend/dist` çıktısını üretip Go uygulamasına gömer.
 
----
+Tam uygulama binary'si derlenmeden önce `main.go` tarafından `go:embed` ile paketlenen `frontend/dist` çıktısı oluşturulmalıdır:
 
-## 🖥️ Kullanım
+```bash
+cd frontend
+npm ci
+npm run build
+cd ..
+wails3 build
+```
 
-1. **URL yapıştır** — Analiz sekmesindeki kutuya YouTube bağlantısını yapıştır
-   (yapıştırınca analiz otomatik başlar) ya da `Enter` / **Analiz Et** düğmesini kullan.
-2. **Kapsam seç** — URL hem video hem playlist içeriyorsa *Sadece video / Tüm playlist* seçicisi görünür.
-3. **Öğeleri seç** — Önizleme listesinde arama yap; tek tek veya başlıktaki checkbox ile tümünü işaretle.
-   Private/silinmiş öğeler pasif gösterilir ve seçilemez.
-4. **Kuralları ayarla** — Sağ panelden Ses/Video modu, format, kalite, çıktı klasörü ve dosya adı şablonunu belirle.
-   "Gelişmiş" bölümünde hız limiti, eşzamanlı parça sayısı ve çerez kaynağı bulunur.
-5. **İndir** — `⬇ N öğeyi indir` düğmesi kuyruğu başlatır ve otomatik olarak Kuyruk sekmesine geçer.
-6. **Kuyruğu yönet** — Her görev satırında: Duraklat / Devam / İptal / Yeniden / Finder'da göster / Sil.
-   Üst çubukta: *Tümünü iptal et*, *Bitenleri temizle*, *Tümünü temizle*.
-7. **Playlist ilerlemesini izle** — Kuyruk üstündeki özet kartı `tamamlanan/toplam` ve yüzde ilerlemeyi gösterir;
-   başarısız öğeler ilerlemeye dahil edilir, işlem bitince sağ altta toast bildirimi çıkar.
+`frontend/tsconfig.json`, `noUnusedLocals` denetimini etkinleştirir; kullanılmayan import ve selector'lar TypeScript build hatasıdır.
 
-### Dosya adı şablonları
-| Şablon | Açıklama |
+## Environment değişkenleri
+
+| Değişken | Açıklama |
 | --- | --- |
-| `%(playlist_index)03d - %(title)s.%(ext)s` | Varsayılan; playlistte `001 - Şarkı.mp3` üretir |
-| `%(title)s.%(ext)s` | İndeksiz sade ad |
-| `%(uploader)s/%(title)s.%(ext)s` | Kanal adıyla alt klasör |
+| `WAILS_VITE_PORT` | Taskfile tarafından kullanılan Vite geliştirme sunucusu portu; varsayılan `9245`. |
+| `GOOS` | Cross-compile hedef işletim sistemi; ör. `windows`, `linux`, `darwin`. |
+| `GOARCH` | Cross-compile hedef mimarisi; ör. `amd64`, `arm64`. |
+| `CGO_ENABLED` | CGO kullanımını belirler; platform build görevleri kendi varsayılanlarını uygular. |
+| `XDG_CONFIG_HOME` | Linux'ta kullanıcı yapılandırma kökünü belirler; boşsa `~/.config` kullanılır. |
+| `VERSION` | `release.sh` paket sürümünü belirler; varsayılan `1.0.1`. |
+| `TARGETS` | `release.sh` hedef listesi; varsayılan `darwin windows linux`. |
+| `MACOSX_DEPLOYMENT_TARGET` | macOS release minimum sürümü; varsayılan `13.0`. |
+| `CODESIGN_IDENTITY` | macOS imza kimliği; varsayılan `-` (ad-hoc). |
+| `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_PASSWORD` | macOS notarization için isteğe bağlı gizli bilgiler; `docs/RELEASES.md` açıklamasına bakın. |
 
-> Playlist indeksi uygulama tarafından doldurulur; tekil video indirmelerinde indeks parçası otomatik kaldırılır.
+## Dokümantasyon
 
-## ⚙️ Ayarlar
+| Belge | İçerik |
+| --- | --- |
+| [Genel Bakış](docs/OVERVIEW.md) | Amaç, yetenekler, sınırlar ve teknoloji yığını |
+| [Kurulum ve Kullanım](docs/INSTALLATION.md) | Son kullanıcı kurulumu, ilk çalıştırma, ekranlar ve sorun giderme |
+| [Geliştirme ve Derleme](docs/DEVELOPMENT.md) | Toolchain, komutlar, platform önkoşulları ve environment |
+| [Mimari](docs/ARCHITECTURE.md) | Katmanlar, Go servisleri, Wails binding ve frontend akışı |
+| [Yapılandırma](docs/CONFIGURATION.md) | Ayar dosyaları, saklama konumları ve bağımlılık yönetimi |
+| [Release ve Yayınlama](docs/RELEASES.md) | Sürüm varlıkları ve dağıtım notları |
+| [Ürün sitesi](website/README.md) | `ytdlp.bengsoft.com` statik site dosyaları ve yayınlama |
 
-Seçenekler, işletim sisteminin kullanıcı yapılandırma dizinindeki `ytdlp-studio`
-klasöründe saklanır:
+## Proje yapısı
 
-- macOS: `~/Library/Application Support/ytdlp-studio/`
-- Windows: `%AppData%\ytdlp-studio\`
-- Linux: `$XDG_CONFIG_HOME/ytdlp-studio/` (tanımlı değilse `~/.config/ytdlp-studio/`)
-
-## 🗂️ Proje Yapısı
-
-```
+```text
 .
-├── main.go                    # Wails uygulaması + servis kayıtları
+├── main.go
 ├── internal/
-│   ├── engine/builder.go      # yt-dlp komut satırı kurulumu + şablon çözümü
-│   └── model/                 # Ortak modeller ve doğrulama (options, media)
-├── services/
-│   ├── analyze.go             # URL ayrıştırma + playlist analizi
-│   ├── download.go            # Kuyruk, pause/resume, batch ilerleme, olaylar
-│   ├── deps.go                # yt-dlp/ffmpeg/ffprobe kurulumu ve güncelleme
-│   ├── settings.go            # Kalıcı ayarlar servisi
-│   └── events.go              # Wails özel olay kayıtları
-└── frontend/
-    ├── src/                   # React uygulaması (store, componentler)
-    └── bindings/              # Wails tarafından üretilen TS binding'leri
+│   ├── engine/              # yt-dlp argüman oluşturma ve process yürütme
+│   └── model/               # DTO, ayarlar ve doğrulama
+├── services/                # Analyze, Download, Deps, Settings servisleri
+├── frontend/
+│   ├── src/                 # React arayüzü ve Zustand store'ları
+│   └── bindings/            # Üretilen Wails TypeScript binding'leri
+├── build/                   # Wails platform yapılandırmaları ve Taskfile'lar
+├── docs/                    # Proje dokümantasyonu ve ekran görüntüsü
+└── website/                 # Tanıtım/indirme sitesi ve web dokümantasyonu
 ```
 
-<!-- ytdlp-studio:xcompile v1 -->
-## 🌍 Cross-Compile (macOS → Windows / Linux)
+## Veri ve gizlilik
 
-Wails v3, kök `Taskfile.yml` üzerindeki `GOOS` değişkeni ile görevleri platform
-Taskfile'lerine dispatch eder (`windows:`, `linux:`, `darwin:`…). Host işletim
-sisteminden farklı bir hedef seçildiğinde derleme, `task setup:docker` ile kurulan
-cross-compile Docker imajı içinde gerçekleştirilir.
+Uygulama ayarları ve araç binary'leri yerel kullanıcı yapılandırma dizininde tutulur. İndirme hedefi, kullanıcının seçtiği çıktı klasörüdür. Kaynakta bir uygulama hesabı veya bulut indirme servisi bulunmaz. URL analizi ve indirme için internet bağlantısı gerekir.
 
-### Ön hazırlık (tek seferlik)
+## Yasal not
 
-```bash
-task setup:docker     # ~800 MB cross-compile imajı (Linux/Windows araç zincirleri)
-wails3 doctor         # ortam doğrulaması
-```
+Link Downloader, yt-dlp kullanan bir istemci uygulamasıdır. İçeriklerin indirilmesinde ilgili platformların kullanım koşullarına, telif haklarına ve geçerli mevzuata uyulmalıdır. İndirilen içeriğin kullanımından kullanıcı sorumludur.
 
-### Windows hedefi (macOS üzerinden)
+## Katkı ve hata bildirimi
 
-```bash
-# Derleme (portable EXE)
-GOOS=windows GOARCH=amd64 task build
-# eşdeğeri:
-wails3 build GOOS=windows GOARCH=amd64
-# çıktı: bin/ytdlp-studio.exe
-```
-
-- Windows hedefi CGO gerektirmez; hedef makinede **WebView2 Runtime** bulunmalıdır.
-- **Paketleme (MSIX):** `makeappx`/`signtool` gibi Windows SDK araçları gerektirir, macOS'ta
-  üretilemez. MSIX için bir Windows makinesinde veya CI'da (GitHub Actions `windows-latest`)
-  `task install:msix:tools` + `task package` çalıştırın; ya da `bin/ytdlp-studio.exe`
-  dosyasını portable olarak dağıtın.
-
-### Linux hedefi (macOS üzerinden)
-
-```bash
-# Derleme
-GOOS=linux GOARCH=amd64 task build
-# Paketleme (çıktı yolu için build/linux/Taskfile.yml / task --list-all)
-GOOS=linux GOARCH=amd64 task package
-```
-
-- Linux GUI hedefi CGO + WebKitGTK başlıkları gerektirdiğinden **Docker imajı zorunludur**
-  (`task setup:docker`).
-- Hedef makinede `libwebkit2gtk-4.1` çalışma zamanı kütüphaneleri bulunmalıdır.
-
-### Mimari varyantları
-
-```bash
-GOOS=linux GOARCH=arm64 task build      # örn. Raspberry Pi / ARM sunucu
-GOOS=windows GOARCH=arm64 task build    # Windows on ARM
-```
-
-### Cross-compile notları
-
-- Frontend (`frontend/dist`) platformdan bağımsızdır ve binary'ye gömülür (`//go:embed`).
-- yt-dlp / ffmpeg / ffprobe / bun, hedef platforma uygun sürümleriyle **çalışma zamanında**
-  otomatik indirilir; cross-build imajına dahil etmenize gerek yoktur.
-- `DownloadService.Reveal` macOS'ta Finder, Windows'ta Explorer kullanır; Linux'ta
-  dosyanın bulunduğu klasörü `xdg-open` ile açar.
-- CI önerisi: matrix kullanarak `windows-latest` üzerinde `task package` (MSIX dahil),
-  `ubuntu-latest` + Docker imajı ile `GOOS=linux task build/package`.
-<!-- ytdlp-studio:xcompile v1:end -->
-
-## 🧯 Sorun Giderme
-
-| Sorun | Çözüm |
-| --- | --- |
-| "Eksik bileşenler" bandı görünüyor | Banttaki **Otomatik Kur** düğmesini kullanın |
-| İndirme hataları / yaşlı yt-dlp | Üst çubuktan **yt-dlp Güncelle** |
-| TS binding hataları | `wails3 generate bindings -clean=true -ts -i` komutunu yeniden çalıştırın |
-| Kuyruk takıldı | Görev satırındaki **İptal** ardından **Yeniden** düğmesini kullanın |
-
-## ⚖️ Yasal Uyarı
-
-Bu araç kişisel kullanım amaçlıdır. Telif hakkıyla korunan içerikleri indirmeden önce
-ilgili platformun hizmet şartlarını ve yerel yasaları kontrol etmek kullanıcının sorumluluğundadır.
+Kaynak kod, değişiklik önerileri ve hata bildirimleri için [GitHub deposunu](https://github.com/kadirnacar/link-downloader) kullanın. Hata raporuna işletim sistemi, uygulama sürümü, Go/Node/Wails sürümleri (kaynak kurulumunda) ve yeniden üretilebilir tam hata çıktısını ekleyin.

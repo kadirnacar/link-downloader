@@ -16,7 +16,6 @@ export function QueuePanel() {
   const clearFinishedLocal = useTasks((s) => s.clearFinished);
   const clearAllLocal = useTasks((s) => s.clearAll);
   const batches = useStore((s) => s.batches);
-  const upsertBatch = useStore((s) => s.upsertBatch);
   const confirmClear = useStore((s) => s.app.confirmClearQueue);
   const set = useStore((s) => s.set);
   const [pending, setPending] = useState<Pending>(null);
@@ -51,7 +50,15 @@ export function QueuePanel() {
   const finished = list.length > 0 && list.every((b) => b.done);
 
   if (order.length === 0) {
-    return <section className="card empty">Kuyruk boş. Analiz ekranından indirme başlatın.</section>;
+    return (
+      <section className="card queue-empty">
+        <div className="empty-symbol" aria-hidden="true">↓</div>
+        <div className="workspace-kicker">İNDİRME ALANI</div>
+        <h2>Henüz sırada bir görev yok.</h2>
+        <p>Bir bağlantıyı analiz edin, indirmek istediğiniz öğeleri seçin ve işlemleri burada takip edin.</p>
+        <button className="btn primary" onClick={() => set({ tab: "analyze" })}>İçerik analizine git <span aria-hidden="true">→</span></button>
+      </section>
+    );
   }
 
   return (

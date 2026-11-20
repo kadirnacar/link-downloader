@@ -49,7 +49,7 @@ Katmanlar arası en belirgin mimari borç, `services` paketinin doğrudan Wails 
 | Orta | `services/playlist_all.go` içinde yalnızca dosyanın kendi içinde çağrılan reflection tabanlı eski yardımcılar vardı. | Referanssız dosya kaldırıldı; aktif analiz servisi doğrudan tipli JSON decode kullanıyor. |
 | Orta | Wails masaüstü uygulamasında HTTP server giriş noktası bulunmadığı hâlde Taskfile ve Docker server şablonu sunucu modu varmış izlenimi veriyordu. | Sunucu modu Taskfile hedefleri ve `build/docker/Dockerfile.server` kaldırıldı. Cross-compile Dockerfile'ları korundu. |
 | Düşük | Tek seferlik exact-string refactor script'i kaynak kod/release akışına bağlı değildi. | Referanssız `apply_refactor.py` kaldırıldı. Aktif build/release scriptleri korunmuştur. |
-| Düşük | README Node sürümü lockfile'daki Vite/eklenti engine gereksiniminden düşüktü; Go test yönergesi frontend'i gereksiz şekilde hazırlatıyordu. | Node alt sınırı Node 20.19 veya 22.13 olarak güncellendi; test talimatı ilgili Go paketleriyle sınırlandı; kurulumda `npm ci` kullanılıyor. |
+| Düşük | README Node sürümü lockfile'daki Vite/eklenti engine gereksiniminden düşüktü; Go test yönergesi frontend'i gereksiz şekilde hazırlatıyordu. | Node alt sınırı Node 20.19 veya 22.12 olarak güncellendi; test talimatı ilgili Go paketleriyle sınırlandı; kurulumda `npm ci` kullanılıyor. |
 
 ### Düzenlenen ana dosyalar
 
@@ -130,3 +130,65 @@ Kullanıcı ortamında şu sırayla doğrulanması önerilir:
 5. Windows ve Linux paketleri için ayrı platform smoke testleri.
 
 **Sonuç:** Paket içinde doğrulanabilir kritik kuyruk/URL/iptal sorunları düzeltilmiş, gereksiz ve mimariyle uyumsuz üç parça kaldırılmış, frontend/backend sözleşmeleri sadeleştirilmiş ve README/build tanımları masaüstü uygulamasının gerçek kapsamıyla hizalanmıştır. En önemli kalan işler kalıcı kuyruk, kontrollü kapanış, başlangıç güncelleme–indirme koordinasyonu ve CI/platform kabul testleridir.
+
+
+## 9. Ürün sitesi, masaüstü UX ve son hata düzeltme turu
+
+Bu ek tur, kullanıcının `wails3 dev` sırasında paylaştığı TypeScript derleme çıktısı ve ürün sitesi/dokümantasyon talebi üzerine gerçekleştirildi.
+
+### 9.1 Paylaşılan TypeScript hataları
+
+| Dosya / konum | Hata | Düzeltme |
+|---|---|---|
+| `frontend/src/App.tsx` | `info?.kind` okunuyor ancak component içinde `info` selector'ı tanımlı değil (`TS2304`). | `useStore((s) => s.info)` selector'ı eklendi. |
+| `frontend/src/components/QueuePanel.tsx` | `upsertBatch` selector'ı tanımlanmış fakat hiç kullanılmıyor (`TS6133` ve `noUnusedLocals`). | Ölü selector kaldırıldı. |
+
+Bu iki düzeltme paylaşılan derleme hatalarının doğrudan kaynaklarına yöneliktir. Wails dev/build yeniden çalıştırılmadığından düzeltmelerin tamamının kullanıcı ortamında başarılı derleme verdiği iddia edilmemektedir.
+
+### 9.2 Masaüstü UX ve ürün kimliği
+
+- Go uygulama adı ve pencere başlığı `Link Downloader` olarak hizalandı; iç Go modülü (`ytdlp-studio`) ve veri klasörü adı değiştirilmedi.
+- Bengsoft ürün kimliği, bundle identifier, Windows/macOS/Linux paket metadatası güncellendi; binary/artefact isimleri mevcut release otomasyonuyla uyumlu kalacak şekilde `ytdlp-studio` olarak korundu.
+- React ana ekranına ürün yönlendirme metni, analiz–özelleştirme–takip adımları ve bağımlılık durum göstergesi eklendi.
+- Sidebar marka alanı ve sistem durumu, analiz boş durumu, kuyruk boş durumu ve önizleme alanı görsel hiyerarşi açısından yenilendi.
+- `frontend/src/index.css` üzerinde koyu lacivert, mavi ve turkuaz temelli masaüstü tasarım sistemi; kartlar, form alanları, durum etiketleri, geçişler, klavye odak stilleri, responsive ölçüler ve reduced-motion desteği eklendi.
+- Inter Medium font asset'i ve lisans metni pakette tutuldu.
+
+### 9.3 Ürün sitesi ve dokümantasyon
+
+`website/` klasörü tamamen bağımsız statik yayın kökü olacak şekilde oluşturuldu:
+
+- `index.html`: ürün tanıtımı, özellikler, ekran görüntüsü, kullanım akışı, indirme CTA'ları ve GitHub bağlantıları.
+- `docs.html`: kullanıcı kurulumu, ekranlar/özellikler, bağımlılıklar, geliştirici ortamı, build, environment değişkenleri, mimari, konfigürasyon ve sorun giderme.
+- `styles.css` ve `script.js`: responsive tasarım, hafif scroll reveal, mobil navigasyon ve reduced-motion saygısı.
+- `assets/appicon.png`, `assets/screenshot.png`: website dışındaki proje dosyalarına ihtiyaç duymayan, pakete gömülü görsel varlıklar.
+- `CNAME`, `robots.txt`, `sitemap.xml`, `README.md`: alan adı ve yayınlama bilgileri.
+
+Site bağlantıları kullanıcı tarafından verilen GitHub deposuna ve GitHub Releases sayfasına yönelir. Gerçek release varlık adları/sürüm numaraları arşivde veya erişilebilen kaynaklarda doğrulanamadığından sabit indirme dosyası URL'si uydurulmadı; ziyaretçi doğrudan Releases sayfasına yönlendirilir.
+
+Kök `README.md` genişletildi; ayrıca `docs/OVERVIEW.md`, `INSTALLATION.md`, `DEVELOPMENT.md`, `ARCHITECTURE.md`, `CONFIGURATION.md` ve `RELEASES.md` proje içi dokümantasyon olarak tutuldu.
+
+### 9.4 Temizleme ve doğruluk düzeltmeleri
+
+- Wails/Vite başlangıç şablonundan kalan ve kaynaklarda kullanılmayan `react.svg`, `wails.png`, `bg-desktop.jpg`, `bg-mobile.jpg` kaldırıldı.
+- Sadece npm'in desteklemediği `minimum-release-age` config değerini taşıyan `frontend/.npmrc` kaldırıldı; bu, kullanıcının npm çıktısında gördüğü `Unknown project config` uyarısının kaynağıydı.
+- Kaynakta referansı olmayan `build/linux/desktop` şablon klasörü kaldırıldı.
+- Taskfile veya paketleme akışında kullanılmayan `build/windows/msix/app_manifest.xml` ve `template.xml` Wails başlangıç örnekleri kaldırıldı; aktif MSIX üretimi `wails3 tool msix` ve `build/config.yml` üzerinden devam eder.
+- `build/config.yml` içindeki işlevsel olmayan `My Other Data` örnek metaveri girdisi kaldırıldı.
+- Kullanıcıya ait toplu Linux derleme yardımındaki WebKitGTK 4.1 hata metni, scriptin fiilen denetlediği GTK4 + WebKitGTK 6.0 + libsoup-3.0 paketleriyle hizalandı.
+- macOS `Taskfile` deployment target ve dev plist minimum sürümü, üretim `Info.plist` ve release script varsayılanıyla aynı olacak şekilde 13.0'a çekildi.
+- `docs/RELEASES.md` ve kök README'ye `VERSION`, `TARGETS`, macOS imza/notarization değişkenleri ve gizli bilgilerin güvenli tutulması eklendi.
+- Vite 8 sürüm koşulu resmi dokümana göre Node 20.19+ veya 22.12+ olarak güncellendi. Vite 8 bu iki Node hattını belirtir; projedeki `go.mod` ise Go 1.27 ister. 【turn819450search6】【turn819450search1】
+- Go test yönergeleri mevcut `scripts/check.sh` içindeki kapsamla uyumlu `go test ./internal/... ./services/...` ve `go vet ./internal/... ./services/...` olarak değiştirildi. Tam Wails binary build öncesinde frontend `dist` çıktısı gerekir.
+- Platform gereksinimleri Wails v3.0.0 resmi kurulum bilgisinden ayrıştırılarak yazıldı: Windows WebView2, macOS Xcode Command Line Tools, Linux varsayılan GTK4/WebKitGTK 6.0; iOS/Android desteği deneysel olarak işaretlendi. 【turn819450search0】【turn819450search1】【turn819450search4】
+
+### 9.5 Yayınlama sınırı
+
+`website/` statik dosyaları hazırdır ve GitHub Pages/custom domain kullanımı için `CNAME` içerir. Bununla birlikte `ytdlp.bengsoft.com` alan adı üzerinde DNS değişikliği, hosting hesabı yapılandırması, TLS ve gerçek yayına alma bu çalışma alanından yapılmadı. Site dosyaları `website/` klasörünün içeriği olarak statik host'un web root'una kopyalanmalıdır.
+
+### 9.6 Bu turun doğrulama sınırları
+
+- Kullanıcının gönderdiği hata mesajları üzerinden iki TypeScript kaynağı statik olarak düzeltildi.
+- HTML/CSS/JS ve dokümanlar statik içerik incelemesinden geçirildi; görsel tarayıcı testi yapılmadı.
+- `wails3 dev`, `wails3 build`, `npm ci`, `npm run build`, Taskfile, `go test`, `go vet` veya release scriptleri çalıştırılmadı.
+- Bu nedenle uygulama build'i, site browser davranışı ve işletim sistemi paketlerinin çalışırlığı doğrulanmış değildir.

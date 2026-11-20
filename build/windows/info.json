@@ -1,26 +1,26 @@
 {
   "fixed": {
-    "file_version": "0.1.0"
+    "file_version": "1.0.1"
   },
   "info": {
     "0409": {
-      "ProductVersion": "0.1.0",
-      "CompanyName": "My Company",
-      "FileDescription": "A ytdlp-studio application",
-      "LegalCopyright": "© 2026, My Company",
-      "ProductName": "My Product",
-      "Comments": "This is a comment"
+      "ProductVersion": "1.0.1",
+      "CompanyName": "Bengsoft",
+      "FileDescription": "Link Downloader desktop application",
+      "LegalCopyright": "© 2026 Bengsoft",
+      "ProductName": "Link Downloader",
+      "Comments": "yt-dlp based media download desktop application"
     }
   },
   "StringFileInfo": {
     "CompanyName": "Bengsoft",
-    "FileDescription": "ytdlp-studio · yt-dlp indirme stüdyosu",
+    "FileDescription": "Link Downloader · yt-dlp media download workspace",
     "FileVersion": "1.0.1",
     "InternalName": "ytdlp-studio",
     "LegalCopyright": "© 2026 Bengsoft · Kadir Niyazi AÇAR",
     "LegalTrademarks": "Bengsoft",
     "OriginalFilename": "ytdlp-studio.exe",
-    "ProductName": "ytdlp-studio",
+    "ProductName": "Link Downloader",
     "ProductVersion": "1.0.1",
     "Comments": "Kadir Niyazi AÇAR · kadirnacar@kadirnacar.com"
   }

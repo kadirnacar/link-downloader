@@ -1,8 +1,8 @@
 # ytdlp-studio:desktop v2
 [Desktop Entry]
 Type=Application
-Name=ytdlp-studio
-GenericName=Media Downloader
+Name=Link Downloader
+GenericName=YouTube Media Downloader
 Comment=yt-dlp tabanlı ses, video ve altyazı indirme stüdyosu
 Exec=ytdlp-studio
 Icon=ytdlp-studio

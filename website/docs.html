@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#08111f">
+  <meta name="description" content="Link Downloader kurulum, kullanım, bağımlılıklar, geliştirme ortamı, derleme ve mimari dokümantasyonu.">
+  <link rel="canonical" href="https://ytdlp.bengsoft.com/docs.html">
+  <title>Dokümantasyon — Link Downloader</title>
+  <link rel="icon" type="image/png" href="assets/appicon.png">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .docs-hero{padding:72px 0 36px;border-bottom:1px solid #c7ddff19}.docs-hero h1{font-size:clamp(38px,5vw,56px);letter-spacing:-2.4px;line-height:1.05;margin:16px 0}.docs-hero p{color:var(--muted);max-width:690px;font-size:14px;line-height:1.8}.docs-layout{display:grid;grid-template-columns:230px minmax(0,1fr);gap:42px;padding:42px 0 100px}.docs-aside{position:sticky;top:25px;align-self:start;padding:17px;border:1px solid #2b425d;border-radius:13px;background:#0e1b2b}.docs-aside b{display:block;font-size:10px;letter-spacing:1.2px;color:var(--teal);margin:0 0 10px}.docs-aside a{display:block;padding:7px 0;color:#9aacc3;font-size:11px}.docs-aside a:hover{color:var(--teal)}.docs-content section{padding:0 0 38px;margin:0 0 38px;border-bottom:1px solid #c7ddff19;scroll-margin-top:30px}.docs-content h2{font-size:24px;letter-spacing:-.8px;margin:0 0 14px}.docs-content h3{font-size:15px;margin:25px 0 9px}.docs-content p,.docs-content li{color:#a5b5c9;font-size:12px;line-height:1.8}.docs-content ul,.docs-content ol{padding-left:20px}.docs-content li{padding:2px 0}.docs-content code{font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:#8fe1d5}.docs-content pre{padding:15px;border:1px solid #2a415d;border-radius:11px;background:#07111f;overflow:auto;color:#c3d5e9;font:11px/1.75 ui-monospace,SFMono-Regular,Menlo,monospace}.docs-content table{width:100%;border-collapse:collapse;margin:15px 0;font-size:11px}.docs-content th,.docs-content td{padding:9px 10px;text-align:left;border-bottom:1px solid #2a405a}.docs-content th{color:var(--text)}.docs-content td{color:#9aacc3}.docs-content a{color:var(--teal);text-decoration:underline;text-underline-offset:3px}.docs-callout{padding:13px 15px;border:1px solid #5b9d9d55;border-radius:11px;background:#72ded310;color:#b7d8da;font-size:11px;line-height:1.7}.docs-content img{max-width:100%;border:1px solid #344c68;border-radius:12px}.docs-back{display:inline-flex;margin-top:20px;color:var(--teal);font-size:11px}@media(max-width:780px){.docs-layout{grid-template-columns:1fr;gap:25px}.docs-aside{position:static;display:grid;grid-template-columns:repeat(2,1fr)}.docs-aside b{grid-column:1/-1}}
+  </style>
+</head>
+<body>
+  <div class="site-shell">
+    <header class="site-header"><a class="brand" href="index.html"><span class="brand-icon">↓</span><span><strong>Link Downloader</strong><small>BENGSOFT · DOCUMENTATION</small></span></a><a class="button button-secondary" href="index.html">← Ana sayfa</a></header>
+    <main class="section-wrap">
+      <section class="docs-hero"><div class="eyebrow"><span class="eyebrow-dot"></span> PROJE DOKÜMANTASYONU</div><h1>Kurulumdan kaynak koda.<br><span style="background:linear-gradient(100deg,#81baff,#73e1d4);background-clip:text;-webkit-background-clip:text;color:transparent">İhtiyacın olan her adım.</span></h1><p>Link Downloader'ın kullanıcı kılavuzu, sistem gereksinimleri, geliştirme ortamı, derleme adımları, yapılandırma alanları ve mimari bileşenleri.</p><a class="docs-back" href="https://github.com/kadirnacar/link-downloader" target="_blank" rel="noreferrer">Kaynak kod ve Markdown dokümanları ↗</a></section>
+      <div class="docs-layout">
+        <aside class="docs-aside"><b>İÇİNDEKİLER</b><a href="#genel">Genel bakış</a><a href="#ekranlar">Ekranlar ve yetenekler</a><a href="#kurulum">Kurulum</a><a href="#bagimliliklar">Bağımlılıklar</a><a href="#gelistirme">Geliştirme ortamı</a><a href="#derleme">Derleme</a><a href="#ortam">Environment</a><a href="#mimari">Mimari</a><a href="#yapilandirma">Yapılandırma</a><a href="#sorunlar">Sorun giderme</a></aside>
+        <article class="docs-content">
+          <section id="genel"><h2>Genel bakış</h2><p>Link Downloader (kod tabanındaki uygulama kimliği: <code>ytdlp-studio</code>), YouTube video ve playlist bağlantılarını analiz etmek; içerik öğelerini seçmek; ses, video ve altyazı indirme seçeneklerini belirlemek; işlemleri kuyruk üzerinden takip etmek için geliştirilmiş masaüstü uygulamasıdır.</p><p>Uygulama, native masaüstü kabuğu için Wails v3, servis ve indirme yönetimi için Go, kullanıcı arayüzü için React ve TypeScript kullanır. Medya çözümleme/indirme yt-dlp, medya birleştirme ve işleme ise FFmpeg araçları üzerinden yürütülür.</p><div class="docs-callout">Uygulama YouTube bağlantı akışına göre tasarlanmıştır. Platformun erişim kuralları, telif hakları ve içerik kullanım izinlerine uymak kullanıcının sorumluluğundadır.</div></section>
+          <section id="ekranlar"><h2>Ekranlar ve yetenekler</h2><h3>İçerik analizi</h3><ul><li>YouTube video, playlist, Shorts, canlı yayın ve mix türündeki URL'leri tanıma.</li><li>Playlist öğelerini başlık, sıra, thumbnail ve süre ile önizleme; arama ve çoklu seçim.</li><li>Ses, video veya altyazı modunu belirleme; ses formatı/kalitesi ve video çözünürlüğü/kapsayıcısı seçimi.</li><li>Çıktı dizini ve dosya adlandırma şablonunu ayarlama.</li></ul><h3>İndirme kuyruğu</h3><ul><li>Birden fazla worker ile eşzamanlı indirme (ayar sınırları dahilinde).</li><li>Tekil veya toplu duraklatma, sürdürme, iptal etme ve yeniden deneme.</li><li>Görev ilerlemesi, hız, ETA, hata bilgisi ve playlist toplu ilerlemesini gösterme.</li><li>Tamamlanan dosyayı dosya yöneticisinde açma; biten görevleri veya kuyruğu temizleme.</li></ul><h3>Ayarlar ve günlük</h3><ul><li>Temel ve gelişmiş yt-dlp argümanlarının yönetimi ve komut önizlemesi.</li><li>yt-dlp, FFmpeg, FFprobe ve JavaScript runtime durumunun denetlenmesi ve eksik bileşenlerin kurulması.</li><li>Uygulama ayarları, tema/aksan, bildirimler ve günlük kayıtlarının yönetimi.</li></ul><img src="assets/screenshot.png" alt="Link Downloader analiz ekranı"><p>Mevcut kaynak pakette bulunan uygulama ekran görüntüsü.</p></section>
+          <section id="kurulum"><h2>Kurulum ve ilk çalıştırma</h2><ol><li><a href="https://github.com/kadirnacar/link-downloader/releases" target="_blank" rel="noreferrer">GitHub Releases</a> sayfasını açın.</li><li>İşletim sisteminize ve işlemci mimarinize uygun yayın paketini seçin. Paket türü ve ek gereksinimler release notlarında belirtilir.</li><li>Kurulum/çıkarma işlemini tamamlayın ve uygulamayı başlatın.</li><li>Uygulamanın Bileşenler / Ayarlar ekranından yt-dlp, FFmpeg, FFprobe ve JS runtime durumunu kontrol edin. Eksik bağımlılıkları uygulama içinden kurabilirsiniz.</li><li>Analiz alanına desteklenen YouTube video veya playlist URL'sini yapıştırın; öğeleri ve indirme seçeneklerini belirleyip kuyruğa gönderin.</li></ol><p>Release dosyalarının isimleri ve platform kapsamı sürüme göre değişebilir. İndirmeden önce ilgili sürümün varlık listesini ve notlarını kontrol edin.</p></section>
+          <section id="bagimliliklar"><h2>Bağımlılıklar ve platform gereksinimleri</h2><table><thead><tr><th>Bileşen</th><th>Rol</th><th>Gereksinim</th></tr></thead><tbody><tr><td>Go</td><td>Backend ve Wails servisleri</td><td>Go 1.27 (go.mod hedefi)</td></tr><tr><td>Node.js + npm</td><td>React/TypeScript frontend</td><td>Node.js ≥ 20.19 veya ≥ 22.12; npm</td></tr><tr><td>Wails CLI</td><td>Dev, binding ve paketleme</td><td>Wails v3.0.0</td></tr><tr><td>yt-dlp</td><td>URL analiz ve indirme</td><td>Uygulama içi bağımlılık yöneticisi tarafından denetlenir</td></tr><tr><td>FFmpeg / FFprobe</td><td>Medya birleştirme ve metadata</td><td>Uygulama içi bağımlılık yöneticisi tarafından denetlenir</td></tr><tr><td>JavaScript runtime</td><td>yt-dlp extractor/challenge desteği</td><td>Bağımlılık durum ekranından izlenir</td></tr></tbody></table><h3>İşletim sistemi geliştirme araçları</h3><ul><li><b>Windows:</b> WebView2 Runtime (Windows 10/11 sistemlerinde çoğunlukla ön yüklüdür).</li><li><b>macOS:</b> macOS 13.0+ ve Xcode Command Line Tools.</li><li><b>Linux:</b> GCC/build-essential, pkg-config, GTK4, WebKitGTK 6.0 ve libsoup 3.0 geliştirme paketleri. Varsayılan yol Ubuntu 24.04+, Debian 13+ ve Fedora 40+ gibi güncel dağıtımları hedefler; hedef dağıtım gereksinimini <code>wails3 doctor</code> ile doğrulayın.</li></ul><p>Güncel Wails platform gereksinimleri: <a href="https://v3.wails.io/getting-started/installation/" target="_blank" rel="noreferrer">Wails v3 Installation</a>.</p></section>
+          <section id="gelistirme"><h2>Geliştirme ortamı</h2><h3>Gerekli araçlar</h3><ul><li>Git</li><li>Go 1.27 (proje modül hedefi)</li><li>Node.js 20.19+ veya 22.12+ ve npm</li><li>Wails CLI v3.0.0</li><li>Task CLI (Taskfile görevlerini çalıştırmak için)</li><li>İşletim sistemine uygun WebView / native build araçları</li></ul><h3>Depoyu hazırlama</h3><pre><code>git clone https://github.com/kadirnacar/link-downloader.git
+cd link-downloader
+
+# Go bağımlılıklarını indir
+go mod download
+
+# Frontend bağımlılıklarını yükle
+cd frontend
+npm ci
+cd ..
+
+# Wails TypeScript binding'lerini üret
+wails3 generate bindings -clean=true -ts -i</code></pre><h3>Geliştirme modunda çalıştırma</h3><pre><code>wails3 dev
+# veya Taskfile üzerinden
+task dev</code></pre><p>Wails dev yapılandırması frontend Vite sunucusunu <code>WAILS_VITE_PORT</code> ile ayarlar; değişken tanımlı değilse Taskfile varsayılanı <code>9245</code> portudur.</p></section>
+          <section id="derleme"><h2>Derleme ve test</h2><h3>Üretim derlemesi</h3><pre><code># Wails CLI
+wails3 build
+
+# Taskfile
+ task build</code></pre><h3>Platform hedefi</h3><pre><code># Taskfile cross-target örnekleri
+GOOS=windows GOARCH=amd64 task build
+GOOS=linux GOARCH=amd64 task build
+GOOS=darwin GOARCH=arm64 task build</code></pre><p>Cross-compile adımları platforma göre native araç zinciri veya Docker kullanabilir. Linux GUI derlemesinde CGO ve WebKit/GTK geliştirme paketleri önemlidir. Ayrıntılı platform koşulları için <a href="https://v3.wails.io/" target="_blank" rel="noreferrer">Wails dokümantasyonuna</a> ve depodaki Taskfile'lara bakın.</p><h3>Go testleri</h3><pre><code># Depodaki check akışıyla aynı Go test kapsamı
+go test ./internal/... ./services/...
+go vet ./internal/... ./services/...
+
+# Tam uygulama build'inden önce frontend çıktısını üretin
+cd frontend
+npm ci
+npm run build
+cd ..
+wails3 build</code></pre><div class="docs-callout">Bu doküman komutları tarif eder; paket üzerinde build veya test çalıştırıldığı anlamına gelmez. Çalıştırma sonuçları, kullanılan yerel toolchain ve platforma bağlıdır.</div></section>
+          <section id="ortam"><h2>Environment değişkenleri</h2><table><thead><tr><th>Değişken</th><th>Kullanım</th><th>Varsayılan / not</th></tr></thead><tbody><tr><td><code>WAILS_VITE_PORT</code></td><td>Taskfile üzerinden Vite dev server portu</td><td>9245</td></tr><tr><td><code>GOOS</code></td><td>Hedef işletim sistemi</td><td>Host OS</td></tr><tr><td><code>GOARCH</code></td><td>Hedef mimari</td><td>Toolchain varsayılanı; ör. amd64, arm64</td></tr><tr><td><code>CGO_ENABLED</code></td><td>CGO gereksinimli derleme yolunu seçme</td><td>Taskfile Windows cross build için 0 varsayar</td></tr><tr><td><code>XDG_CONFIG_HOME</code></td><td>Linux kullanıcı config kök dizini</td><td>Tanımlı değilse ~/.config</td></tr><tr><td><code>VERSION</code></td><td>release.sh paket sürümü</td><td>1.0.1</td></tr><tr><td><code>TARGETS</code></td><td>release.sh platform hedefleri</td><td>darwin windows linux</td></tr><tr><td><code>MACOSX_DEPLOYMENT_TARGET</code></td><td>macOS minimum sürüm hedefi</td><td>13.0</td></tr><tr><td><code>CODESIGN_IDENTITY</code></td><td>macOS kod imzalama kimliği</td><td>- (ad-hoc)</td></tr><tr><td><code>APPLE_ID</code>, <code>APPLE_TEAM_ID</code>, <code>APPLE_APP_PASSWORD</code></td><td>Apple notarization</td><td>Üçü birlikte tanımlanırsa etkin</td></tr></tbody></table><p>Uygulama ayarları, <code>os.UserConfigDir()</code> altında <code>ytdlp-studio</code> klasörüne yazılır. Ayrıntılar Yapılandırma bölümündedir.</p></section>
+          <section id="mimari"><h2>Mimari ve kaynak yapısı</h2><pre><code>.
+├── main.go                  # Wails uygulama başlatma ve servis kaydı
+├── internal/
+│   ├── engine/              # yt-dlp argüman ve process yürütme
+│   └── model/               # Ayarlar, medya modelleri ve doğrulama
+├── services/
+│   ├── analyze.go           # URL parse, medya/playlist analizi, altyazı
+│   ├── download.go          # Worker kuyruğu, durum ve batch progress
+│   ├── deps.go              # yt-dlp / FFmpeg / JS runtime yönetimi
+│   ├── settings.go          # JSON ayar kalıcılığı
+│   └── events.go            # Wails event adaptörleri
+├── frontend/
+│   ├── src/                 # React UI, Zustand state, sayfalar
+│   └── bindings/             # Wails tarafından üretilen TypeScript API
+├── build/                   # Wails platform yapılandırmaları ve Taskfile'lar
+├── docs/                    # Markdown proje dokümantasyonu
+└── website/                 # Ürün sitesi ve statik dokümantasyon</code></pre><h3>Servis sınırları</h3><ul><li><code>AnalyzeService</code>: URL doğrulama/ayrıştırma, medya ve playlist metadatası ile altyazı seçenekleri.</li><li><code>DownloadService</code>: görev kuyruğu, worker çalıştırma, pause/resume/cancel, snapshot ve batch ilerlemesi.</li><li><code>DepsService</code>: yt-dlp, FFmpeg, FFprobe ve JS runtime denetimi/kurulumu/güncellemesi.</li><li><code>SettingsService</code>: uygulama ve indirme seçeneklerinin yüklenmesi, kaydedilmesi, sıfırlanması.</li></ul><h3>Frontend entegrasyonu</h3><p>Wails binding'leri <code>frontend/bindings</code> altında üretilir. React sayfaları API servislerini <code>frontend/src/api.ts</code> üzerinden kullanır; global arayüz durumu Zustand store'larında, görev durumları ayrı task store içinde tutulur. Backend olayları task/batch progress, dependency status ve log line güncellemelerini iletir.</p></section>
+          <section id="yapilandirma"><h2>Yapılandırma ve veri dosyaları</h2><p>Dosyalar platformun Go <code>os.UserConfigDir()</code> konumunda <code>ytdlp-studio</code> alt dizininde saklanır:</p><table><thead><tr><th>Platform</th><th>Temel konum</th></tr></thead><tbody><tr><td>macOS</td><td><code>~/Library/Application Support/ytdlp-studio/</code></td></tr><tr><td>Windows</td><td><code>%AppData%\ytdlp-studio\</code></td></tr><tr><td>Linux</td><td><code>${XDG_CONFIG_HOME:-~/.config}/ytdlp-studio/</code></td></tr></tbody></table><ul><li><code>settings.json</code>: indirme/yt-dlp seçenekleri.</li><li><code>app.json</code>: görünüm, worker sayısı, bildirim, başlangıç kontrolleri gibi uygulama ayarları.</li><li><code>bin/</code>: uygulamanın indirdiği araç binary'leri için bağımlılık dizini.</li></ul><p>İndirme çıktıları kullanıcının belirlediği klasöre yazılır; uygulama config diziniyle aynı olmak zorunda değildir.</p></section>
+          <section id="sorunlar"><h2>Sorun giderme</h2><h3>Uygulama açılırken bağımlılık uyarısı</h3><p>Bileşenler sayfasında durumları kontrol edin. Gerekirse eksikleri otomatik kurun ve yeniden denetleyin.</p><h3>TypeScript binding hatası</h3><p>Go servis API'lerinde değişiklik yapıldıysa Wails binding'lerini yeniden üretin; `frontend/bindings` dosyalarını elle düzenlemeyin.</p><h3>Geliştirme sunucusu başlamıyor</h3><p>Node.js/npm sürümünü ve <code>WAILS_VITE_PORT</code> portunun kullanımda olup olmadığını kontrol edin. Wails CLI sürümünün projedeki <code>@wailsio/runtime</code> paketiyle uyumlu olduğundan emin olun.</p><h3>Linux derleme sorunu</h3><p>GCC, pkg-config, GTK ve WebKitGTK geliştirme paketlerinin kurulu olduğundan emin olun; <code>wails3 doctor</code> çıktısını inceleyin.</p><p>Hata raporlarında işletim sistemi, Go/Node/npm/Wails sürümü ve tam hata çıktısını ekleyin.</p><a class="docs-back" href="https://github.com/kadirnacar/link-downloader/issues" target="_blank" rel="noreferrer">GitHub üzerinde hata bildir ↗</a></section>
+        </article>
+      </div>
+    </main>
+    <footer class="site-footer section-wrap"><a class="brand footer-brand" href="index.html"><span class="brand-icon">↓</span><span><strong>Link Downloader</strong><small>BENGSOFT</small></span></a><p>Proje dokümantasyonu · Kaynak kodla birlikte güncellenir.</p><div class="footer-links"><a href="index.html">Ana sayfa</a><a href="https://github.com/kadirnacar/link-downloader" target="_blank" rel="noreferrer">GitHub</a></div></footer>
+  </div>
+</body>
+</html>

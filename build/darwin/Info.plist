@@ -11,19 +11,19 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>tr</string>
 	<key>CFBundleDisplayName</key>
-	<string>ytdlp-studio</string>
+	<string>Link Downloader</string>
 	<key>CFBundleExecutable</key>
 	<string>ytdlp-studio</string>
 	<key>CFBundleGetInfoString</key>
-	<string>ytdlp-studio 1.0.1 · Bengsoft</string>
+	<string>Link Downloader 1.0.1 · Bengsoft</string>
 	<key>CFBundleIconFile</key>
 	<string>icons</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.bengsoft.ytdlp-studio</string>
+	<string>com.bengsoft.linkdownloader</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>ytdlp-studio</string>
+	<string>Link Downloader</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

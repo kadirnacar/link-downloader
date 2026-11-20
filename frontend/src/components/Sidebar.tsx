@@ -25,9 +25,9 @@ export function Sidebar() {
   return (
     <aside className={app.sidebarCollapsed ? "sidebar collapsed" : "sidebar"}>
       <div className="brand">
-        <div className="brand-mark">⬇</div>
+        <div className="brand-mark" aria-hidden="true"><span>↓</span></div>
         {!app.sidebarCollapsed && (
-          <div><strong>ytdlp-studio</strong><span>yt-dlp masaüstü stüdyosu</span></div>
+          <div><strong>Link Downloader</strong><span>yt-dlp Studio · Bengsoft</span></div>
         )}
       </div>
 
@@ -46,7 +46,7 @@ export function Sidebar() {
 
       {!app.sidebarCollapsed && (
         <div className="sidebar-bottom">
-          <strong>Bileşenler</strong>
+          <strong>Sistem durumu</strong>
           <div className="dep-row"><span>yt-dlp</span><i className={deps?.ytDlp ? "dot online" : "dot"} /></div>
           <div className="dep-row"><span>ffmpeg</span><i className={deps?.ffmpeg ? "dot online" : "dot"} /></div>
           <div className="dep-row"><span>ffprobe</span><i className={deps?.ffprobe ? "dot online" : "dot"} /></div>

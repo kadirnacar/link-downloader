@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#08111f">
+  <meta name="description" content="Link Downloader; yt-dlp ile YouTube video, ses ve playlist indirmelerini kolayca analiz etmenizi ve yönetmenizi sağlayan açık kaynak masaüstü uygulaması.">
+  <meta property="og:title" content="Link Downloader — İçeriğini kontrol ederek indir">
+  <meta property="og:description" content="Video, ses ve playlist indirmeleri için sade, açık kaynak masaüstü stüdyosu.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://ytdlp.bengsoft.com/assets/screenshot.png">
+  <link rel="canonical" href="https://ytdlp.bengsoft.com/">
+  <title>Link Downloader — Bengsoft</title>
+  <link rel="icon" type="image/png" href="assets/appicon.png">
+  <link rel="preload" as="image" href="assets/screenshot.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="site-shell">
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="Link Downloader ana sayfa">
+        <span class="brand-icon" aria-hidden="true">↓</span>
+        <span><strong>Link Downloader</strong><small>BENGSOFT · DESKTOP</small></span>
+      </a>
+      <button class="menu-toggle" type="button" aria-label="Menüyü aç" aria-expanded="false" aria-controls="main-nav"><span></span><span></span></button>
+      <nav class="main-nav" id="main-nav" aria-label="Ana menü">
+        <a href="#ozellikler">Özellikler</a>
+        <a href="#arayuz">Arayüz</a>
+        <a href="docs.html">Dokümantasyon</a>
+        <a href="https://github.com/kadirnacar/link-downloader" target="_blank" rel="noreferrer">Kaynak kod</a>
+        <a class="nav-download" href="https://github.com/kadirnacar/link-downloader/releases" target="_blank" rel="noreferrer">İndir <span aria-hidden="true">↗</span></a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero section-wrap">
+        <div class="hero-copy reveal">
+          <div class="eyebrow"><span class="eyebrow-dot"></span> AÇIK KAYNAK · MASAÜSTÜ UYGULAMASI</div>
+          <h1>Bağlantını ekle.<br><span>İndirmeyi kontrol et.</span></h1>
+          <p class="hero-lead">YouTube video ve playlist içeriklerini analiz et, ses veya video seçeneklerini belirle, indirmelerini sade bir masaüstü arayüzünden yönet.</p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="https://github.com/kadirnacar/link-downloader/releases" target="_blank" rel="noreferrer">En son sürümü indir <span aria-hidden="true">↗</span></a>
+            <a class="button button-secondary" href="https://github.com/kadirnacar/link-downloader" target="_blank" rel="noreferrer">GitHub'da incele <span aria-hidden="true">⌘</span></a>
+          </div>
+          <div class="hero-notes">
+            <span><i></i> Açık kaynak</span>
+            <span><i></i> Windows · macOS · Linux hedefleri</span>
+            <span><i></i> Go + Wails + React</span>
+          </div>
+        </div>
+        <div class="hero-visual reveal reveal-delay" aria-label="Link Downloader uygulama arayüzü">
+          <div class="visual-glow"></div>
+          <div class="window-frame">
+            <div class="window-top"><div class="window-lights"><i></i><i></i><i></i></div><span>LINK DOWNLOADER <b>·</b> İÇERİK ANALİZİ</span><span class="window-status"><i></i> HAZIR</span></div>
+            <img src="assets/screenshot.png" alt="Link Downloader uygulamasının video ve playlist analiz ekranı" width="2546" height="1674">
+          </div>
+          <div class="floating-note note-top"><span class="note-icon">↗</span><span><b>Kolay seçim</b><small>Playlist öğelerini tek tek seç</small></span></div>
+          <div class="floating-note note-bottom"><span class="note-icon note-green">✓</span><span><b>Canlı takip</b><small>İlerleme, hız ve kalan süre</small></span></div>
+        </div>
+      </section>
+
+      <section class="trust-strip section-wrap reveal" aria-label="Teknoloji ve yetenekler">
+        <span>GÜNLÜK KULLANIM İÇİN TASARLANDI</span>
+        <div class="trust-items"><b>yt-dlp</b><i></i><b>FFmpeg</b><i></i><b>Wails v3</b><i></i><b>React</b><i></i><b>Go</b></div>
+      </section>
+
+      <section class="features section-wrap" id="ozellikler">
+        <div class="section-heading reveal"><div class="eyebrow">DAHA AZ KARMAŞA, DAHA FAZLA KONTROL</div><h2>İhtiyacın olan her şey,<br><span>tek çalışma alanında.</span></h2><p>Bağlantı analizinden çıktı klasörüne kadar temel adımlar görünür ve yönetilebilir.</p></div>
+        <div class="feature-grid">
+          <article class="feature-card reveal"><div class="feature-icon blue">⌕</div><div class="feature-index">01 / ANALİZ</div><h3>Önce içeriği gör</h3><p>Video veya playlist bağlantısını çözümle. Başlık, küçük resim, süre ve indirilebilir öğeleri indirmeden önce incele.</p></article>
+          <article class="feature-card reveal reveal-delay-1"><div class="feature-icon aqua">♫</div><div class="feature-index">02 / FORMAT</div><h3>İstediğin biçimde al</h3><p>Ses veya video modunu, kaliteyi, çözünürlüğü, kapsayıcıyı ve dosya adı şablonunu belirle.</p></article>
+          <article class="feature-card reveal reveal-delay-2"><div class="feature-icon violet">▤</div><div class="feature-index">03 / KUYRUK</div><h3>İşlemleri sıraya koy</h3><p>Birden fazla öğeyi yönet. Görevleri duraklat, sürdür, iptal et, yeniden dene veya tamamlananları temizle.</p></article>
+          <article class="feature-card reveal"><div class="feature-icon green">◷</div><div class="feature-index">04 / TAKİP</div><h3>Durumu anlık izle</h3><p>Yüzde, indirme hızı, tahmini süre ve playlist toplam ilerlemesini tek bir ekrandan takip et.</p></article>
+          <article class="feature-card reveal reveal-delay-1"><div class="feature-icon orange">⚙</div><div class="feature-index">05 / ARAÇLAR</div><h3>Bağımlılıkları yönet</h3><p>yt-dlp, FFmpeg, FFprobe ve JavaScript çalışma ortamının durumunu görüntüle; eksikleri uygulama içinden kur.</p></article>
+          <article class="feature-card reveal reveal-delay-2"><div class="feature-icon pink">☷</div><div class="feature-index">06 / AYARLAR</div><h3>İş akışını özelleştir</h3><p>Gelişmiş yt-dlp seçeneklerini, indirme davranışını, görünümü ve bildirimleri kendi kullanımına göre düzenle.</p></article>
+        </div>
+      </section>
+
+      <section class="showcase section-wrap" id="arayuz">
+        <div class="showcase-copy reveal"><div class="eyebrow">MASAÜSTÜNDE SADE BİR DENEYİM</div><h2>Ne olduğunu gör.<br><span>Ne yaptığını bil.</span></h2><p>Arayüz, sık kullanılan işlemleri öne çıkarır; ayrıntılı seçenekleri ise gerektiğinde erişilebilir tutar. İndirme kuyruğu, sistem bileşenleri ve günlük ekranları işlemin her aşamasını takip etmene yardım eder.</p><a class="text-link" href="docs.html#ekranlar">Ekranları ve kullanım akışını incele <span>→</span></a></div>
+        <figure class="screenshot-card reveal reveal-delay"><div class="screenshot-caption"><span>UYGULAMA GÖRÜNÜMÜ</span><span>ANALİZ ÇALIŞMA ALANI</span></div><img src="assets/screenshot.png" alt="Uygulamanın analiz ekranı; sol gezinme, URL girişi, içerik önizlemesi ve hızlı indirme seçenekleri" loading="lazy"><figcaption>Uygulama arayüzünden mevcut ekran görüntüsü. Yeni sürümlerdeki görünüm farklılık gösterebilir.</figcaption></figure>
+      </section>
+
+      <section class="steps section-wrap">
+        <div class="section-heading center reveal"><div class="eyebrow">ÜÇ ADIMDA BAŞLA</div><h2>Bağlantıdan dosyaya.</h2><p>İndirme akışının her aşaması anlaşılır ve kontrol edilebilir.</p></div>
+        <div class="step-grid">
+          <article class="step-card reveal"><b>01</b><div><h3>Bağlantıyı yapıştır</h3><p>YouTube video veya playlist URL'sini analiz alanına ekle.</p></div></article>
+          <article class="step-card reveal reveal-delay-1"><b>02</b><div><h3>İçeriği ve kaliteyi seç</h3><p>Öğeleri işaretle; ses/video formatını ve çıktı ayarlarını belirle.</p></div></article>
+          <article class="step-card reveal reveal-delay-2"><b>03</b><div><h3>Kuyruğu takip et</h3><p>İlerlemeyi izle, gerektiğinde görevleri duraklat veya iptal et.</p></div></article>
+        </div>
+      </section>
+
+      <section class="download-section section-wrap" id="indir">
+        <div class="download-panel reveal">
+          <div class="download-copy"><div class="eyebrow">AÇIK KAYNAK · GITHUB RELEASES</div><h2>Link Downloader'ı<br><span>ücretsiz edin.</span></h2><p>Platformuna uygun güncel kurulum veya taşınabilir paketi GitHub Releases sayfasından seç. Paket türleri ve sürüm notları her yayınla birlikte listelenir.</p><a class="button button-primary" href="https://github.com/kadirnacar/link-downloader/releases" target="_blank" rel="noreferrer">İndirme sayfasını aç <span aria-hidden="true">↗</span></a></div>
+          <div class="platform-list">
+            <a href="https://github.com/kadirnacar/link-downloader/releases" target="_blank" rel="noreferrer"><span class="platform-icon">▣</span><span><b>Windows</b><small>Release varlıklarından uygun paketi seç</small></span><i>↗</i></a>
+            <a href="https://github.com/kadirnacar/link-downloader/releases" target="_blank" rel="noreferrer"><span class="platform-icon">◉</span><span><b>macOS</b><small>Release varlıklarından uygun paketi seç</small></span><i>↗</i></a>
+            <a href="https://github.com/kadirnacar/link-downloader/releases" target="_blank" rel="noreferrer"><span class="platform-icon">⌘</span><span><b>Linux</b><small>Dağıtımına ve mimarine uygun paketi kontrol et</small></span><i>↗</i></a>
+            <p class="platform-footnote">Paket bulunabilirliği sürüme göre değişebilir. İndirmeden önce release açıklamasını ve sistem gereksinimlerini kontrol et.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="docs-section section-wrap" id="dokumantasyon">
+        <div class="docs-heading reveal"><div><div class="eyebrow">KULLANIMDAN GELİŞTİRMEYE</div><h2>İhtiyacın olan bilgi,<br><span>doğru yerde.</span></h2></div><a class="text-link" href="docs.html">Tüm dokümantasyon <span>→</span></a></div>
+        <div class="docs-grid">
+          <a class="doc-card reveal" href="docs.html#kurulum"><span class="doc-type">KULLANIM</span><b>Kurulum ve ilk çalıştırma</b><small>İndirme, sistem gereksinimleri ve ilk bağlantı.</small><i>↗</i></a>
+          <a class="doc-card reveal reveal-delay-1" href="docs.html#gelistirme"><span class="doc-type">GELİŞTİRİCİ</span><b>Geliştirme ve derleme</b><small>Go, Node.js, Wails CLI, ortam değişkenleri ve build adımları.</small><i>↗</i></a>
+          <a class="doc-card reveal reveal-delay-2" href="docs.html#mimari"><span class="doc-type">MİMARİ</span><b>Proje yapısı</b><small>Go servisleri, domain modelleri, Wails binding ve frontend.</small><i>↗</i></a>
+        </div>
+      </section>
+
+      <section class="final-cta section-wrap reveal"><div><div class="eyebrow">KAYNAĞI İNCELE · KATKI VER</div><h2>Açık geliştirme.<br><span>Şeffaf indirme akışı.</span></h2></div><div class="final-actions"><a class="button button-secondary" href="https://github.com/kadirnacar/link-downloader" target="_blank" rel="noreferrer">GitHub deposu ↗</a><a class="button button-primary" href="https://github.com/kadirnacar/link-downloader/releases" target="_blank" rel="noreferrer">Sürümleri görüntüle ↗</a></div></section>
+    </main>
+
+    <footer class="site-footer section-wrap"><a class="brand footer-brand" href="#top"><span class="brand-icon">↓</span><span><strong>Link Downloader</strong><small>BENGSOFT</small></span></a><p>yt-dlp tabanlı açık kaynak masaüstü uygulaması.</p><div class="footer-links"><a href="docs.html">Dokümantasyon</a><a href="https://github.com/kadirnacar/link-downloader" target="_blank" rel="noreferrer">GitHub</a><a href="https://github.com/kadirnacar/link-downloader/releases" target="_blank" rel="noreferrer">İndir</a></div><small class="copyright">© 2026 Bengsoft · İndirilen içeriklerin kullanım ve telif sorumluluğu kullanıcıya aittir.</small></footer>
+  </div>
+  <script src="script.js" defer></script>
+</body>
+</html>
