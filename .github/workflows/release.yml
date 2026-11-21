@@ -98,7 +98,7 @@ jobs:
             f="build/linux/icons/hicolor/${s}x${s}/apps/ytdlp-studio.png"
             [ -f "$f" ] && install -Dm644 "$f" "$D/usr/share/icons/hicolor/${s}x${s}/apps/ytdlp-studio.png"
           done
-          printf 'Package: ytdlp-studio\nVersion: 1.0.1\nArchitecture: ${{ matrix.goarch }}\nMaintainer: ytdlp-studio\nDepends: libgtk-4-1, libwebkitgtk-6.0-4, libsoup-3.0-0\nDescription: yt-dlp desktop download studio\n' > "$D/DEBIAN/control"
+          printf 'Package: ytdlp-studio\nVersion: 1.0.2\nArchitecture: ${{ matrix.goarch }}\nMaintainer: ytdlp-studio\nDepends: libgtk-4-1, libwebkitgtk-6.0-4, libsoup-3.0-0\nDescription: yt-dlp desktop download studio\n' > "$D/DEBIAN/control"
           printf '[Desktop Entry]\nType=Application\nName=ytdlp-studio\nExec=ytdlp-studio\nIcon=ytdlp-studio\nCategories=AudioVideo;Network;\nTerminal=false\n' > "$D/usr/share/applications/ytdlp-studio.desktop"
           dpkg-deb --build "$D" "release/ytdlp-studio_linux_${{ matrix.goarch }}.deb"
           rm -rf "$D"

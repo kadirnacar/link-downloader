@@ -15,13 +15,13 @@
   "StringFileInfo": {
     "CompanyName": "Bengsoft",
     "FileDescription": "Link Downloader · yt-dlp media download workspace",
-    "FileVersion": "1.0.1",
+    "FileVersion": "1.0.2",
     "InternalName": "ytdlp-studio",
     "LegalCopyright": "© 2026 Bengsoft · Kadir Niyazi AÇAR",
     "LegalTrademarks": "Bengsoft",
     "OriginalFilename": "ytdlp-studio.exe",
     "ProductName": "Link Downloader",
-    "ProductVersion": "1.0.1",
+    "ProductVersion": "1.0.2",
     "Comments": "Kadir Niyazi AÇAR · kadirnacar@kadirnacar.com"
   }
 }

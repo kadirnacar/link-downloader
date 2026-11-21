@@ -16,7 +16,7 @@ export MACOSX_DEPLOYMENT_TARGET="$MIN_MACOS"
 export CGO_CFLAGS="${CGO_CFLAGS:-} -mmacosx-version-min=$MIN_MACOS"
 export CGO_LDFLAGS="${CGO_LDFLAGS:-} -mmacosx-version-min=$MIN_MACOS"
 
-VER="${VERSION:-1.0.1}"
+VER="${VERSION:-1.0.2}"
 if [ -z "$VER" ] && [ -x /usr/libexec/PlistBuddy ] && [ -f build/darwin/Info.plist ]; then
   VER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' build/darwin/Info.plist 2>/dev/null || true)"
 fi
