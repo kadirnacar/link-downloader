@@ -12,7 +12,7 @@ info:
   copyright: "(c) 2026, Bengsoft" # Copyright text
   comments: "Link Downloader desktop application" # Comments
   version: "1.0.1" # The application version
-  # cfBundleIconName: "appicon" # The macOS icon name in Assets.car icon bundles (optional)
+  cfBundleIconName: "appicon" # Matches build/appicon.icon and the generated macOS asset catalog
   #                               # Should match the name of your .icon file without the extension
   #                               # If not set and Assets.car exists, defaults to "appicon"
 

@@ -127,7 +127,7 @@ func RunDownload(ctx context.Context, args []string, url string, h Hooks) error 
 		h.OnLog("cmd: yt-dlp " + strings.Join(redactArgsForLog(final), " "))
 	}
 
-	cmd := exec.CommandContext(ctx, bin, final...)
+	cmd := exec.Command(bin, final...)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return err
@@ -136,7 +136,8 @@ func RunDownload(ctx context.Context, args []string, url string, h Hooks) error 
 	if err != nil {
 		return err
 	}
-	if err := cmd.Start(); err != nil {
+	process, err := startManagedProcess(ctx, cmd)
+	if err != nil {
 		return err
 	}
 
@@ -211,7 +212,7 @@ func RunDownload(ctx context.Context, args []string, url string, h Hooks) error 
 	wg.Wait()
 	close(scanErrs)
 
-	werr := cmd.Wait()
+	werr := process.Wait()
 	var scanErr error
 	for err := range scanErrs {
 		if scanErr == nil {
@@ -255,11 +256,15 @@ func ExtractInfo(ctx context.Context, target string, extra ...string) ([]byte, e
 	}
 	args = append(args, "--", target)
 
-	cmd := exec.CommandContext(ctx, bin, args...)
+	cmd := exec.Command(bin, args...)
 	var out, errb bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &errb
-	if err := cmd.Run(); err != nil {
+	process, startErr := startManagedProcess(ctx, cmd)
+	if startErr != nil {
+		return nil, startErr
+	}
+	if err := process.Wait(); err != nil {
 		msg := strings.TrimSpace(errb.String())
 		if msg == "" {
 			msg = err.Error()

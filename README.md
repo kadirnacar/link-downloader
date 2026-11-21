@@ -161,7 +161,7 @@ wails3 build
 ├── internal/
 │   ├── engine/              # yt-dlp argüman oluşturma ve process yürütme
 │   └── model/               # DTO, ayarlar ve doğrulama
-├── services/                # Analyze, Download, Deps, Settings servisleri
+├── services/                # Analyze, Download, Deps, Settings, queue store ve lifecycle
 ├── frontend/
 │   ├── src/                 # React arayüzü ve Zustand store'ları
 │   └── bindings/            # Üretilen Wails TypeScript binding'leri
@@ -181,3 +181,12 @@ Link Downloader, yt-dlp kullanan bir istemci uygulamasıdır. İçeriklerin indi
 ## Katkı ve hata bildirimi
 
 Kaynak kod, değişiklik önerileri ve hata bildirimleri için [GitHub deposunu](https://github.com/kadirnacar/link-downloader) kullanın. Hata raporuna işletim sistemi, uygulama sürümü, Go/Node/Wails sürümleri (kaynak kurulumunda) ve yeniden üretilebilir tam hata çıktısını ekleyin.
+
+
+## Persistent queue and shutdown recovery
+
+Masaüstü uygulaması indirme kuyruğunu kullanıcının uygulama yapılandırma klasöründeki `queue.json` dosyasında saklar. Dosya atomik olarak güncellenir. Bekleyen görevler yeniden açılışta özgün sırayla yüklenir; uygulama kapandığında indirme/dönüştürme aşamasında olanlar `paused` olarak geri yüklenir ve kullanıcı tarafından sürdürülebilir. Wails kapanış callback'i durumu kaydeder, worker context'lerini iptal eder ve desteklenen platformlarda yt-dlp/FFmpeg proses ağaçlarını sonlandırır.
+
+Bağımlılık kurma/güncelleme işlemleri exclusive tool-operation kilidi alır. İndirme ve metadata analizi shared erişim alır; bu sayede araç kullanımdayken yt-dlp güncellenemez.
+
+Kuyruk dosyası tek çalışan uygulama örneği için tasarlanmıştır. Çok süreçli veritabanı değildir ve süreçler arası kilit sağlamaz.

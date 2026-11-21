@@ -32,6 +32,10 @@ export function Reset(): $CancellablePromise<model$0.DownloadOptions> {
     return $Call.ByID(2997875165);
 }
 
+/**
+ * ResetApp remains available for existing clients; resetting either settings
+ * surface commits both settings files through the same recoverable journal.
+ */
 export function ResetApp(): $CancellablePromise<model$0.AppSettings> {
     return $Call.ByID(3395919764);
 }

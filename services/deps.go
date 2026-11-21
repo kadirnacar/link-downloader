@@ -34,10 +34,20 @@ type DepStatus struct {
 }
 
 type DepsService struct {
-	mu sync.Mutex
+	mu  sync.Mutex
+	ctx context.Context
 }
 
-func NewDepsService() *DepsService { return &DepsService{} }
+func NewDepsService() *DepsService {
+	return NewDepsServiceWithContext(context.Background())
+}
+
+func NewDepsServiceWithContext(ctx context.Context) *DepsService {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return &DepsService{ctx: ctx}
+}
 
 func exeName(n string) string {
 	if runtime.GOOS == "windows" {
@@ -192,11 +202,11 @@ func prepareToolDir(ff, fp string) string {
 	return dir
 }
 
-func probeVersion(bin string, arg string, timeout time.Duration) (string, error) {
+func probeVersion(parent context.Context, bin string, arg string, timeout time.Duration) (string, error) {
 	if bin == "" {
 		return "", fmt.Errorf("binary yok")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, bin, arg).Output()
 	if err != nil {
@@ -224,6 +234,8 @@ func manualHint(component string) string {
 }
 
 func (s *DepsService) CheckDeps() DepStatus {
+	toolOperationGate.Lock()
+	defer toolOperationGate.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.checkDeps()
@@ -263,7 +275,7 @@ func (s *DepsService) checkDeps() DepStatus {
 		st.Missing = append(st.Missing, "deno/bun")
 	}
 	if yt != "" {
-		if v, err := probeVersion(yt, "--version", 25*time.Second); err == nil {
+		if v, err := probeVersion(s.ctx, yt, "--version", 25*time.Second); err == nil {
 			st.YtDlpVer = v
 		} else {
 			st.Notes = append(st.Notes, "yt-dlp çalıştırılamadı: "+err.Error())
@@ -286,13 +298,15 @@ func safeInstall(fn func()) (err error) {
 }
 
 func (s *DepsService) InstallDeps() (DepStatus, error) {
+	toolOperationGate.Lock()
+	defer toolOperationGate.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.installDeps()
 }
 
 func (s *DepsService) installDeps() (DepStatus, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Minute)
+	ctx, cancel := context.WithTimeout(s.ctx, 25*time.Minute)
 	defer cancel()
 	st := s.checkDeps()
 
@@ -333,6 +347,8 @@ func (s *DepsService) installDeps() (DepStatus, error) {
 
 // EnsureDeps eksikleri indirir, kurar ve binary'leri gerçekten çalıştırarak doğrular.
 func (s *DepsService) EnsureDeps() (DepStatus, error) {
+	toolOperationGate.Lock()
+	defer toolOperationGate.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	st := s.checkDeps()
@@ -345,7 +361,7 @@ func (s *DepsService) EnsureDeps() (DepStatus, error) {
 		verificationErrors = append(verificationErrors, "yt-dlp")
 	}
 	if st.FFmpegPath != "" {
-		if v, e := probeVersion(st.FFmpegPath, "-version", 25*time.Second); e != nil {
+		if v, e := probeVersion(s.ctx, st.FFmpegPath, "-version", 25*time.Second); e != nil {
 			st.Notes = append(st.Notes, "ffmpeg doğrulanamadı: "+e.Error())
 			verificationErrors = append(verificationErrors, "ffmpeg")
 		} else {
@@ -353,7 +369,7 @@ func (s *DepsService) EnsureDeps() (DepStatus, error) {
 		}
 	}
 	if st.FFprobePath != "" {
-		if v, e := probeVersion(st.FFprobePath, "-version", 25*time.Second); e != nil {
+		if v, e := probeVersion(s.ctx, st.FFprobePath, "-version", 25*time.Second); e != nil {
 			st.Notes = append(st.Notes, "ffprobe doğrulanamadı: "+e.Error())
 			verificationErrors = append(verificationErrors, "ffprobe")
 		} else {
@@ -373,6 +389,8 @@ func (s *DepsService) EnsureDeps() (DepStatus, error) {
 }
 
 func (s *DepsService) UpdateYtDlp(channel string) (string, error) {
+	toolOperationGate.Lock()
+	defer toolOperationGate.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	yt := look("yt-dlp")
@@ -386,7 +404,7 @@ func (s *DepsService) UpdateYtDlp(channel string) (string, error) {
 	case "master":
 		args = []string{"--update-to", "master"}
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(s.ctx, 5*time.Minute)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, yt, args...).CombinedOutput()
 	s.checkDeps()

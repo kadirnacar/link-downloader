@@ -86,12 +86,15 @@ React, React DOM, Zustand ve Wails runtime frontend kaynaklarında kullanılıyo
 
 Aşağıdaki maddeler bu pakette tamamlanmış sayılmamalıdır. Bunlar kaynak incelemesinde tespit edilen sonraki geliştirme ihtiyaçlarıdır.
 
-### P1 — İşletim ve veri güvenilirliği
+### P1 — İşletim ve veri güvenilirliği (bu teslimatta uygulandı)
 
-1. **Kuyruk kalıcılığı:** Görev, batch ve ilerleme bilgileri yalnızca `DownloadService` belleğinde. Uygulama kapatılıp açıldığında kuyruk ve geçmiş kaybolur. İstenen davranışa göre SQLite veya küçük bir transactional store ile görev metadata'sı saklanmalı; devam ettirme politikası ayrıca tanımlanmalıdır.
-2. **Graceful shutdown:** Wails uygulaması kapanırken worker goroutine'leri ve aktif yt-dlp/ffmpeg çocuk süreçleri için açık bir kapanış/iptal koordinasyonu bulunmuyor. App shutdown lifecycle'ına bağlanan servis durdurma akışı ve platforma göre process-group/tree terminate davranışı eklenmelidir.
-3. **Başlangıç güncellemesi ile indirme koordinasyonu:** `DepsService` kendi kurulum/güncelleme metotlarını kilitliyor; fakat bu kilit aktif `DownloadService` prosesleriyle paylaşılmıyor. UI açılırken arka plandaki yt-dlp güncellemesi kullanıcı indirmesiyle çakışabilir. Tek bir dependency-operation gate veya başlangıç işi bitene kadar indirme başlatmayı engelleyen durum yönetimi eklenmelidir.
-4. **Ayar yükleme hatalarının görünür kılınması:** `Load` / `LoadApp` dosya okunamadığında, JSON bozuk olduğunda veya tanınmayan alan bulunduğunda varsayılan döndürüyor; neden bilgisi UI'a taşınmıyor. En azından uyarı/log üretilmeli. `Reset` ve `ResetApp` iki ayrı yazım olduğundan ikinci dosya başarısızsa diskte kısmi sıfırlama oluşabilir; ortak atomik ResetAll işlemi tercih edilmelidir.
+1. **Kuyruk kalıcılığı — tamamlandı:** Görev, batch, deneme sayısı, sıra, durum, dosya yolu ve son kaydedilmiş ilerleme `queue.json` içine atomik olarak yazılır. Açılışta kuyruktaki görevler özgün sırayla yüklenir; önceki oturumda aktif olan görevler otomatik başlatılmaz, `paused` durumunda gösterilir ve kullanıcı eylemiyle sürdürülür.
+2. **Graceful shutdown — tamamlandı:** Wails `OnShutdown` hook'u uygulama context'ini iptal eder, analiz/altyazı isteklerini durdurur, indirme servisinin yeni iş kabul etmesini kapatır, aktif işleri `paused` olarak kaydeder ve worker'ların sonlanmasını bekler.
+3. **Alt proses yaşam döngüsü — tamamlandı (kaynak düzeyinde):** yt-dlp Unix benzeri sistemlerde ayrı process group içinde çalışır; iptalde process group SIGTERM/SIGKILL ile sonlandırılır. Windows'ta `taskkill /T /F` ile proses ağacı kapatılır. Gerçek platform kabul testi yapılmadı.
+4. **Başlangıç güncellemesi ile indirme koordinasyonu — tamamlandı:** `toolOperationGate` metadata/indirme işlemlerine ortak read-lock, dependency discovery/install/update/path refresh'e write-lock verir. Binary'nin aktif kullanım sırasında değiştirilmesi engellenir.
+5. **Ayar sıfırlama — tamamlandı:** `settings-reset.json` işlem günlüğü, settings ve app ayarlarının birlikte sıfırlanmasını kurtarılabilir hâle getirir. Uygulama yarıda kapanırsa sonraki ayar erişimi reset'i tamamlar.
+
+**P1 sınırı:** Kuyruk dosyası tek uygulama örneği içindir; birden fazla çalışan süreç arasında kilit sağlamaz. Zorla sonlandırma/güç kaybı Wails shutdown hook'unu çalıştıramaz; en son atomik snapshot geri yüklenir ve ilerleme son yazımdan birkaç saniye geride olabilir.
 
 ### P2 — Mimari ve güvenlik
 
@@ -103,7 +106,7 @@ Aşağıdaki maddeler bu pakette tamamlanmış sayılmamalıdır. Bunlar kaynak 
 
 ### P3 — Kalite ve dağıtım
 
-10. **Subprocess testleri:** URL parser, queue state ve argüman üretimi için regresyon testleri mevcut/güncellendi. Gerçek yt-dlp binary, FFmpeg dönüşüm, yarıda kesilen pipe, çok uzun stdout/stderr satırı, Windows process tree ve ağ hatası senaryoları için entegrasyon testleri eklenmeli.
+10. **Subprocess testleri:** Bu teslimatta `queue_store_test.go` ile queue snapshot round-trip, bozuk/uyumsuz JSON ve Unix dosya izni kontrolleri için test kaynağı eklendi; testler çalıştırılmadı. Gerçek yt-dlp binary, FFmpeg dönüşüm, yarıda kesilen pipe, çok uzun stdout/stderr satırı, Windows process tree ve ağ hatası senaryoları için entegrasyon testleri hâlâ eklenmeli.
 11. **Platform kabul testleri:** macOS ana hedef olsa da Windows/Linux için Finder/Explorer/`xdg-open`, dosya izinleri, atomik config replace, WebView bağımlılıkları ve paket kurulumları gerçek makinelerde doğrulanmalı.
 12. **CI:** Arşivde `.github/workflows` CI tanımı yok. macOS/Windows/Linux build matrix'i, Go testleri, TypeScript typecheck/build, release artifact ve imza kontrolleri eklenmeli.
 13. **Mobil şablonlar:** `build/ios` ve `build/android` Wails şablonları arşivde var; fakat uygulamanın yt-dlp/FFmpeg binary ve `os/exec` temelli masaüstü akışı mobilde çalışır kabul edilemez. Mobil hedefler ya gerçek cihaz kabul testleriyle desteklenmeli ya da desteklenmeyen scaffold olarak açıkça işaretlenmelidir.
@@ -113,10 +116,11 @@ Aşağıdaki maddeler bu pakette tamamlanmış sayılmamalıdır. Bunlar kaynak 
 ## 7. Doğrulama durumu ve sınırlar
 
 - Kaynaklar ve frontend–backend çağrıları statik olarak incelendi.
-- Düzenlenen Go dosyaları `gofmt` ile biçimlendirildi.
+- Düzenlenen Go dosyaları `gofmt` ile biçimlendirildi; `gofmt -d` fark üretmedi.
+- `build/config.yml`, `icon.json`, macOS plist dosyaları, Icon Composer SVG'si ve website HTML sayfaları statik olarak parse edildi; ikon görsellerinin biçim/boyut imzaları kontrol edildi.
 - Proje scriptleri çalıştırılmadı.
-- `go test`, `go build`, `wails3 build`, `npm ci`, `npm run build`, release/package scriptleri çalıştırılmadı.
-- Bu nedenle build/test sonucu **doğrulanmamıştır**. Yeni/yenilenen test senaryoları pakete dahildir ancak çalıştırılmamıştır.
+- `go test`, `go build`, `wails3 dev/build`, `npm ci`, `npm run build`, Taskfile ve release/package scriptleri çalıştırılmadı.
+- Bu nedenle build/test sonucu **doğrulanmamıştır**. `services/queue_store_test.go` yeni test kaynağı olarak eklendi ancak çalıştırılmadı.
 - macOS, Windows ve Linux üzerinde gerçek uygulama çalıştırma / yt-dlp indirme kabul testi yapılmadı.
 
 ## 8. Önerilen doğrulama sırası
@@ -129,7 +133,7 @@ Kullanıcı ortamında şu sırayla doğrulanması önerilir:
 4. Gerçek uygulamada URL host kötüye kullanımı, playlist reverse, pause/resume/cancel, silinen queued task, batch completion, uzun log satırı ve yt-dlp güncellemesi senaryoları.
 5. Windows ve Linux paketleri için ayrı platform smoke testleri.
 
-**Sonuç:** Paket içinde doğrulanabilir kritik kuyruk/URL/iptal sorunları düzeltilmiş, gereksiz ve mimariyle uyumsuz üç parça kaldırılmış, frontend/backend sözleşmeleri sadeleştirilmiş ve README/build tanımları masaüstü uygulamasının gerçek kapsamıyla hizalanmıştır. En önemli kalan işler kalıcı kuyruk, kontrollü kapanış, başlangıç güncelleme–indirme koordinasyonu ve CI/platform kabul testleridir.
+**Sonuç:** Önceki kaynak temizliği ve ürün sitesi korunarak P1 kapsamındaki kalıcı kuyruk, kontrollü kapanış, alt proses yaşam döngüsü, dependency-update/indirme koordinasyonu ve kurtarılabilir ayar sıfırlaması kaynak düzeyinde yeniden uygulandı. P2 mimari ayrıştırma/güvenlik çalışmaları ile P3 CI ve gerçek platform kabul testleri bu paketin sonraki geliştirme adımlarıdır.
 
 
 ## 9. Ürün sitesi, masaüstü UX ve son hata düzeltme turu
@@ -192,3 +196,26 @@ Kök `README.md` genişletildi; ayrıca `docs/OVERVIEW.md`, `INSTALLATION.md`, `
 - HTML/CSS/JS ve dokümanlar statik içerik incelemesinden geçirildi; görsel tarayıcı testi yapılmadı.
 - `wails3 dev`, `wails3 build`, `npm ci`, `npm run build`, Taskfile, `go test`, `go vet` veya release scriptleri çalıştırılmadı.
 - Bu nedenle uygulama build'i, site browser davranışı ve işletim sistemi paketlerinin çalışırlığı doğrulanmış değildir.
+
+
+## P1 — Operations hardening (reconstructed)
+
+This package reconstructs the previously requested P1 operational improvements on top of the complete product website/documentation package.
+
+### Applied source changes
+
+- Replaced the Wails starter artwork in `build/appicon.icon/Assets/link_downloader_icon.svg` with the Link Downloader brand image and regenerated PNG/ICO/ICNS/Android/website icon assets from one source.
+- Added a versioned, strict JSON queue store at the per-user configuration directory (`queue.json`), written through temp-file + fsync + atomic rename with user-only permissions on Unix-like systems.
+- Restores queued downloads on startup in their original queue order. Tasks that were active at the last shutdown are restored as paused, preserving their last progress and allowing explicit resume.
+- Added a bounded worker lifecycle and shutdown routine. Wails `OnShutdown` persists queue state, stops new work, cancels active workers, and waits up to the shutdown deadline.
+- Added managed process groups on Unix and process-tree termination via `taskkill /T` on Windows for yt-dlp/FFmpeg child processes.
+- Added a shared/exclusive tool-operation gate: downloads and metadata extraction share-read; dependency discovery/installation/update takes exclusive access so binary replacement cannot race a running operation.
+- Added a reset journal (`settings-reset.json`) that recovers both settings files after an interrupted reset. Reset from the UI now commits both settings files in one recoverable operation.
+
+### Remaining limitations
+
+- The queue store is single-instance JSON persistence; it does not provide cross-process locking. Multi-instance safety and SQLite remain a separate P2/P3 design decision.
+- A forced process termination (SIGKILL, power loss or Task Manager force-end) cannot run Wails shutdown hooks. The most recent atomic queue snapshot is recovered on next launch; the in-flight item's last persisted progress may be slightly stale.
+- Icon Composer/ICNS/ICO assets were generated/updated at source level but must be inspected in a macOS/Windows/Linux package to verify OS-specific icon caching and appearance.
+- Added `services/queue_store_test.go` for persistence serialization, strict document validation, and Unix permission expectations; it was not executed.
+- No build, test, Taskfile, npm, Wails or release scripts were run during this reconstruction.

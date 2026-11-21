@@ -3,8 +3,10 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"log"
+	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"ytdlp-studio/services"
@@ -17,9 +19,13 @@ func main() {
 	settings := services.NewSettingsService()
 	appCfg := settings.LoadApp()
 
-	deps := services.NewDepsService()
-	download := services.NewDownloadService(appCfg.Workers)
-	analyze := &services.AnalyzeService{}
+	appCtx, appCancel := context.WithCancel(context.Background())
+	deps := services.NewDepsServiceWithContext(appCtx)
+	download, err := services.NewPersistentDownloadService(appCfg.Workers)
+	if err != nil {
+		log.Fatalf("download queue could not be restored: %v", err)
+	}
+	analyze := services.NewAnalyzeService()
 
 	app := application.New(application.Options{
 		Name: "Link Downloader",
@@ -40,6 +46,14 @@ func main() {
 	}
 	tuneWindow(&opts)
 	app.Window.NewWithOptions(opts)
+	app.OnShutdown(func() {
+		appCancel()
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		if err := services.ShutdownServices(ctx, analyze, download); err != nil {
+			log.Printf("application service shutdown: %v", err)
+		}
+	})
 
 	if appCfg.CheckDepsOnStart || appCfg.YtDlpAutoUpdate {
 		go func() {

@@ -11,13 +11,58 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"ytdlp-studio/internal/engine"
 	"ytdlp-studio/internal/model"
 )
 
-type AnalyzeService struct{}
+type AnalyzeService struct {
+	mu     sync.Mutex
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
+	closed bool
+}
+
+func NewAnalyzeService() *AnalyzeService {
+	ctx, cancel := context.WithCancel(context.Background())
+	return &AnalyzeService{ctx: ctx, cancel: cancel}
+}
+
+func (s *AnalyzeService) beginOperation(timeout time.Duration) (context.Context, func(), error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return nil, nil, errors.New("uygulama kapanıyor; analiz başlatılamaz")
+	}
+	if s.ctx == nil {
+		s.ctx, s.cancel = context.WithCancel(context.Background())
+	}
+	ctx, cancel := context.WithTimeout(s.ctx, timeout)
+	s.wg.Add(1)
+	return ctx, func() { cancel(); s.wg.Done() }, nil
+}
+
+// Shutdown cancels metadata and subtitle extraction processes, then waits for
+// all requests to release the shared yt-dlp operation gate.
+func (s *AnalyzeService) shutdown(ctx context.Context) error {
+	s.mu.Lock()
+	s.closed = true
+	if s.cancel != nil {
+		s.cancel()
+	}
+	s.mu.Unlock()
+	done := make(chan struct{})
+	go func() { s.wg.Wait(); close(done) }()
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
 
 type SubtitleTrack struct {
 	Lang string   `json:"lang"`
@@ -169,10 +214,21 @@ func (s *AnalyzeService) Analyze(raw, scope, playlistItems string) (*model.Media
 		target = "https://www.youtube.com/watch?v=" + p.VideoID
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer cancel()
+	ctx, endOperation, opErr := s.beginOperation(10 * time.Minute)
+	if opErr != nil {
+		return nil, opErr
+	}
+	defer endOperation()
 
-	data, err := engine.ExtractInfo(ctx, target, engine.AnalyzeArgs(target, playlistItems, reverse)...)
+	release, gateErr := acquireToolRead(ctx)
+	if gateErr != nil {
+		return nil, gateErr
+	}
+	var data []byte
+	func() {
+		defer release()
+		data, err = engine.ExtractInfo(ctx, target, engine.AnalyzeArgs(target, playlistItems, reverse)...)
+	}()
 	if err != nil {
 		return nil, fmt.Errorf("içerik analizi başarısız: %w", err)
 	}
@@ -286,10 +342,21 @@ func (s *AnalyzeService) Subtitles(raw string) (*SubtitleInfo, error) {
 		return nil, errors.New("desteklenmeyen bağlantı: YouTube video URL'si gerekli")
 	}
 	target := "https://www.youtube.com/watch?v=" + p.VideoID
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-	defer cancel()
+	ctx, endOperation, opErr := s.beginOperation(3 * time.Minute)
+	if opErr != nil {
+		return nil, opErr
+	}
+	defer endOperation()
 
-	data, err := engine.ExtractInfo(ctx, target, "--skip-download", "--no-playlist")
+	release, gateErr := acquireToolRead(ctx)
+	if gateErr != nil {
+		return nil, gateErr
+	}
+	var data []byte
+	func() {
+		defer release()
+		data, err = engine.ExtractInfo(ctx, target, "--skip-download", "--no-playlist")
+	}()
 	if err != nil {
 		return nil, err
 	}

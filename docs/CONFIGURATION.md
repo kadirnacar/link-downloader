@@ -45,3 +45,13 @@ Uygulama ayarları worker adedi, açık/koyu tema, accent rengi, bildirimler, ku
 ## Environment
 
 `XDG_CONFIG_HOME` Linux config kökünü etkiler. `WAILS_VITE_PORT` yalnızca geliştirme server portunu etkiler. `GOOS`, `GOARCH` ve `CGO_ENABLED` build hedefi/derleme yoluyla ilgilidir; kullanıcı ayarlarının yerine geçmez.
+
+
+## Persistent download queue
+
+The application stores the queue in `queue.json` in the same per-user configuration directory used by the settings files. The file is versioned and atomically replaced. On Unix-like systems the file is restricted to the current user (`0600`) and the containing app directory is restricted to the current user (`0700`).
+
+Queued tasks are restored automatically and retain their order. Tasks that were active when the last snapshot was recorded are restored as paused and require an explicit Resume action. Invalid stored task options or unsupported URLs are not executed; they are surfaced as error tasks. The queue store is designed for a single running application instance and does not provide cross-process locking.
+
+Resetting settings writes a `settings-reset.json` journal first, then writes both `settings.json` and `app.json`. If the application is interrupted during this operation, the next settings load/save completes the reset from the journal.
+

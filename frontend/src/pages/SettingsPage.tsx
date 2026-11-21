@@ -31,7 +31,7 @@ export function SettingsPage() {
   async function reset() {
     try {
       const o = await SettingsService.Reset();
-      const a = await SettingsService.ResetApp();
+      const a = await SettingsService.LoadApp();
       set({ options: o, app: a });
       setMsg("Varsayılanlar kaydedildi.");
     } catch (e) {
